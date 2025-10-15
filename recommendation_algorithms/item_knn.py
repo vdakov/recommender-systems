@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
-import scipy.spatial.distance as dist
+from tqdm import tqdm
+from scipy.spatial.distance import cosine
 
 # TODO: what if user in test not in train?
 
@@ -15,7 +16,7 @@ def item_similarity(item1_ratings, item2_ratings) -> float:
     merged = pd.merge(item1_ratings, item2_ratings, on='user_id', suffixes=('_1', '_2'), how='inner')
     if merged.empty:
         return 0.0
-    sim = dist.cosine(merged['rating_1'], merged['rating_2'])  # TODO: check
+    sim = cosine(merged['rating_1'], merged['rating_2'])  # TODO: check
     return sim
 
 
@@ -39,7 +40,7 @@ class ItemKNN:
 
     def compute_item_similarity_matrix(self):
         self.similarity_matrix = pd.DataFrame(np.zeros((len(self.item_ids), len(self.item_ids))), index=self.item_ids, columns=self.item_ids)
-        for i in range(len(self.item_ids)):
+        for i in tqdm(range(len(self.item_ids))):
             for j in range(i+1, len(self.item_ids)):
                 sim = self.item_similarity_train(self.item_ids[i], self.item_ids[j])
                 self.similarity_matrix.at[self.item_ids[i], self.item_ids[j]] = sim

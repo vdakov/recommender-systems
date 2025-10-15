@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
-import scipy.stats as stats # for pearsonr, want the statistic, not the p-value
+from tqdm import tqdm
+import scipy.stats as stats # TODO: for pearsonr, want the statistic, not the p-value - spatial.distance.correlation?
 
 def user_similarity(user1_ratings, user2_ratings) -> float:
     """
