@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import scipy.spatial.distance as dist
-from torchgen.native_function_generation import self_to_out_signature
 
 # TODO: what if user in test not in train?
 

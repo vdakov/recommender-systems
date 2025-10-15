@@ -1,7 +1,14 @@
 import pandas as pd
 import numpy as np
+import scipy.stats as stats # for pearsonr, want the statistic, not the p-value
 
 def user_similarity(user1_ratings, user2_ratings) -> float:
+    """
+    Compute Pearson correlation similarity between two users based on shared item ratings.
+    :param user1_ratings: Series of ratings with index = item_id
+    :param user2_ratings: Series of ratings with index = item_id
+    :return:
+    """
     pass
 
 class UserKNN:
