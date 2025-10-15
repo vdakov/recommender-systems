@@ -27,7 +27,7 @@ class ItemKNN:
         Parameters
         :param train_data: pd.DataFrame with columns ['user_id', 'item_id', 'rating']
         :param test_data: pd.DataFrame with columns ['user_id', 'item_id', 'rating']
-        :param k:
+        :param k: k value for number of nearest neighbors
         """
         self.train_data = train_data
         self.test_data = test_data
