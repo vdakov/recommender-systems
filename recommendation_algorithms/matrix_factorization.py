@@ -5,7 +5,7 @@ class MatrixFactorizationSGD:
     """
     Matrix Factorization for rating prediction using Stochastic Gradient Descent (SGD).
 
-    This code has been copied from Assignment 2 of the DSAIT4335 (Recommender Systems) course at TU Delft.
+    This code is copied from Assignment 2 of the DSAIT4335 (Recommender Systems) course at TU Delft.
 
     Rating matrix R ≈ P × Q^T + biases
     """

@@ -1,7 +1,9 @@
 import pandas as pd
 import numpy as np
 import scipy.spatial.distance as dist
+from torchgen.native_function_generation import self_to_out_signature
 
+# TODO: what if user in test not in train?
 
 def item_similarity(item1_ratings, item2_ratings) -> float:
     """
@@ -31,18 +33,18 @@ class ItemKNN:
         """
         self.train_data = train_data
         self.test_data = test_data
+        self.item_ids = self.train_data['item_id'].unique()
         self.k = k
         self.similarity_matrix = pd.DataFrame()  # Empty so that it can be filled later
         self.fit = False
 
     def compute_item_similarity_matrix(self):
-        items = self.train_data['item_id'].unique()
-        self.similarity_matrix = pd.DataFrame(np.zeros((len(items), len(items))), index=items, columns=items)
-        for i in range(len(items)):
-            for j in range(i+1, len(items)):
-                sim = self.item_similarity_train(items[i], items[j])
-                self.similarity_matrix.at[items[i], items[j]] = sim
-                self.similarity_matrix.at[items[j], items[i]] = sim
+        self.similarity_matrix = pd.DataFrame(np.zeros((len(self.item_ids), len(self.item_ids))), index=self.item_ids, columns=self.item_ids)
+        for i in range(len(self.item_ids)):
+            for j in range(i+1, len(self.item_ids)):
+                sim = self.item_similarity_train(self.item_ids[i], self.item_ids[j])
+                self.similarity_matrix.at[self.item_ids[i], self.item_ids[j]] = sim
+                self.similarity_matrix.at[self.item_ids[j], self.item_ids[i]] = sim
         self.fit = True
 
     def item_similarity_train(self, item1, item2) -> float:
