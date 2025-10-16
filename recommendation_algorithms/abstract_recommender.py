@@ -1,18 +1,38 @@
 from abc import ABC, abstractmethod
-from typing import List
 import pandas as pd
 
+
 class AbstractRecommender(ABC):
+    """
+    Abstract class to represent a recommendation model.
+    All models in the hybrid recommender must extend this class and implement its methods.
+    """
+
     @abstractmethod
     def train(self, train_data: pd.DataFrame) -> None:
+        """
+        This method prepares the model for usage, e.g. computing similarity matrices and training models.
+
+        :param train_data: Dataframe containing training data, relevant keys: user_id, item_id, rating.
+        """
         pass 
+
+    @abstractmethod
+    def get_name(self) -> str:
+        """
+        Get the name of the model (used for pretty printing).
+
+        :return: The name of the model
+        """
+        pass
 
     @abstractmethod
     def predict_score(self, user_id: int, item_id: int) -> float:
-        # TODO
-        pass 
+        """
+        Predict a score a user would give a specific item.
 
-    @abstractmethod
-    def predict_top_k(self, user_id: int, k: int) -> List[int]:
-        # TODO, has to know all scores for all algorithms for all user/item pairs
-        pass
+        :param user_id: The id of the user
+        :param item_id: The id of the item
+        :return: Predicted score
+        """
+        pass 
