@@ -1,0 +1,141 @@
+import pandas as pd
+import numpy as np
+
+class MatrixFactorizationSGD:
+    """
+    Matrix Factorization for rating prediction using Stochastic Gradient Descent (SGD).
+
+    This code is copied from Assignment 2 of the DSAIT4335 (Recommender Systems) course at TU Delft.
+
+    Rating matrix R ≈ P × Q^T + biases
+    """
+
+    def __init__(self, n_factors=20, learning_rate=0.01, regularization=0.02, n_epochs=20, use_bias=True):
+        self.n_factors = n_factors
+        self.learning_rate = learning_rate
+        self.regularization = regularization
+        self.n_epochs = n_epochs
+        self.use_bias = use_bias
+
+        # Model parameters
+        self.P = None  # User latent factors
+        self.Q = None  # Item latent factors
+        self.user_bias = None
+        self.item_bias = None
+        self.global_mean = None
+
+    def fit(self, ratings: pd.DataFrame, verbose=True):
+        """
+        Train the model.
+
+        Args:
+            ratings (pd.DataFrame): dataframe with [user_id, item_id, rating]
+        """
+        # Map IDs to indices
+        self.user_mapping = {u: i for i, u in enumerate(ratings['user_id'].unique())}
+        self.item_mapping = {i: j for j, i in enumerate(ratings['item_id'].unique())}
+        self.user_inv = {i: u for u, i in self.user_mapping.items()}
+        self.item_inv = {j: i for i, j in self.item_mapping.items()}
+
+        n_users = len(self.user_mapping)
+        n_items = len(self.item_mapping)
+
+        # Initialize factors
+        self.P = np.random.normal(0, 0.1, (n_users, self.n_factors))
+        self.Q = np.random.normal(0, 0.1, (n_items, self.n_factors))
+
+        if self.use_bias:
+            self.user_bias = np.zeros(n_users)
+            self.item_bias = np.zeros(n_items)
+            self.global_mean = ratings['rating'].mean()
+
+        # Convert to (user_idx, item_idx, rating) triples
+        training_data = [(self.user_mapping[u], self.item_mapping[i], r)
+                         for u, i, r in zip(ratings['user_id'], ratings['item_id'], ratings['rating'])]
+
+        # SGD loop
+        for epoch in range(self.n_epochs):
+            np.random.shuffle(training_data)
+            total_error = 0
+
+            for u, i, r in training_data:
+                pred = np.dot(self.P[u], self.Q[i])
+                if self.use_bias:
+                    pred += self.global_mean + self.user_bias[u] + self.item_bias[i]
+
+                err = r - pred
+                total_error += err ** 2
+
+                # Updates
+                P_u = self.P[u]
+                Q_i = self.Q[i]
+
+                self.P[u] += self.learning_rate * (err * Q_i - self.regularization * P_u)
+                self.Q[i] += self.learning_rate * (err * P_u - self.regularization * Q_i)
+
+                if self.use_bias:
+                    self.user_bias[u] += self.learning_rate * (err - self.regularization * self.user_bias[u])
+                    self.item_bias[i] += self.learning_rate * (err - self.regularization * self.item_bias[i])
+
+            rmse = np.sqrt(total_error / len(training_data))
+            if verbose:
+                print(f"Epoch {epoch + 1}/{self.n_epochs} - RMSE: {rmse:.4f}")
+
+        return self
+
+    def predict_single(self, user_id, item_id):
+        """Predict rating for a single (user, item) pair"""
+        if user_id not in self.user_mapping or item_id not in self.item_mapping:
+            return np.nan
+
+        u = self.user_mapping[user_id]
+        i = self.item_mapping[item_id]
+
+        pred = np.dot(self.P[u], self.Q[i])
+        if self.use_bias:
+            pred += self.global_mean + self.user_bias[u] + self.item_bias[i]
+        return pred
+
+    def predict(self, test_data):
+        """Predict ratings for a test dataframe with [user_id, item_id]"""
+        preds = []
+        for u, i in zip(test_data['user_id'], test_data['item_id']):
+            preds.append(self.predict_single(u, i))
+        return np.array(preds)
+
+    def recommend_topk(self, user_id, train_data, n=10, exclude_seen=True):
+        """
+        Generate Top-K recommendations for a given user.
+
+        Args:
+            user_id (int): target user ID (original ID, not index).
+            train_data (pd.DataFrame): training ratings [user_id, item_id, rating],
+                                       used to exclude already-seen items.
+            k (int): number of recommendations.
+            exclude_seen (bool): whether to exclude items the user already rated.
+
+        Returns:
+            list of (item_id, predicted_score) sorted by score desc.
+        """
+        if user_id not in self.user_mapping:
+            return []
+
+        u = self.user_mapping[user_id]
+
+        # Predict scores for all items
+        scores = np.dot(self.P[u], self.Q.T)
+        if self.use_bias:
+            scores += self.global_mean + self.user_bias[u] + self.item_bias
+
+        # Exclude seen items
+        if exclude_seen:
+            seen_items = train_data[train_data['user_id'] == user_id]['item_id'].values
+            seen_idx = [self.item_mapping[i] for i in seen_items if i in self.item_mapping]
+            scores[seen_idx] = -np.inf
+
+        # Get top-K items
+        top_idx = np.argsort(scores)[::-1][:n]
+        top_items = [self.item_inv[i] for i in top_idx]
+        top_scores = scores[top_idx]
+
+        return list(zip(top_items, top_scores))
