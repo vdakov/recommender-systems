@@ -7,16 +7,16 @@ from scipy.spatial.distance import cosine
 
 def item_similarity(item1_ratings, item2_ratings) -> float:
     """
-    Coompute cosine similarity between two items based on shared user ratings.
+    Compute cosine similarity between two items based on shared user ratings.
 
     :param item1_ratings:
     :param item2_ratings:
     :return:
     """
-    merged = pd.merge(item1_ratings, item2_ratings, on='user_id', suffixes=('_1', '_2'), how='inner')
+    merged = pd.merge(item1_ratings, item2_ratings, left_index=True, right_index=True, suffixes=('_1', '_2'), how='inner')
     if merged.empty:
         return 0.0
-    sim = cosine(merged['rating_1'], merged['rating_2'])  # TODO: check
+    sim = 1 - cosine(merged['rating_1'], merged['rating_2'])
     return sim
 
 
@@ -39,6 +39,9 @@ class ItemKNN:
         self.fit = False
 
     def compute_item_similarity_matrix(self):
+        """
+        Compute the item similarity matrix and store it in self.similarity_matrix.
+        """
         self.similarity_matrix = pd.DataFrame(np.zeros((len(self.item_ids), len(self.item_ids))), index=self.item_ids, columns=self.item_ids)
         for i in tqdm(range(len(self.item_ids))):
             for j in range(i+1, len(self.item_ids)):
@@ -50,23 +53,34 @@ class ItemKNN:
     def item_similarity_train(self, item1, item2) -> float:
         """
         Compute item similarity based on training data. If matrix has already been computed, retrieve the value there.
+
+        Parameters:
+        :param item1: item id
+        :param item2: item id
+
+        Returns:
+        :return: similarity score as a float
         """
         if self.fit:
             return self.similarity_matrix.at[item1, item2]
 
-        i1_ratings = self.train_data[self.train_data['item_id'] == item1][['user_id', 'rating']]
-        i2_ratings = self.train_data[self.train_data['item_id'] == item2][['user_id', 'rating']]
+        i1_ratings = self.train_data[self.train_data['item_id'] == item1][['user_id', 'rating']].set_index('user_id')
+        i2_ratings = self.train_data[self.train_data['item_id'] == item2][['user_id', 'rating']].set_index('user_id')
         return item_similarity(i1_ratings, i2_ratings)
 
     def item_similarity_test(self, item1, item2) -> float:
         """
         Compute item similarity based on test data.
+
+        Parameters:
         :param item1:
         :param item2:
+
+        Returns:
         :return: similarity score as a float
         """
-        i1_ratings = self.test_data[self.train_data['item_id'] == item1][['user_id', 'rating']]
-        i2_ratings = self.test_data[self.train_data['item_id'] == item2][['user_id', 'rating']]
+        i1_ratings = self.test_data[self.train_data['item_id'] == item1][['user_id', 'rating']].set_index('user_id')
+        i2_ratings = self.test_data[self.train_data['item_id'] == item2][['user_id', 'rating']].set_index('user_id')
         return item_similarity(i1_ratings, i2_ratings)
 
 

@@ -1,3 +1,5 @@
 .venv
 _MACOSX
 .idea
+
+recommendation_algorithms/__pycache__/

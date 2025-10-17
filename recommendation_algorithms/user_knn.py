@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
-import scipy.stats as stats # TODO: for pearsonr, want the statistic, not the p-value - spatial.distance.correlation?
+from scipy.spatial.distance import correlation
 
 def user_similarity(user1_ratings, user2_ratings) -> float:
     """
@@ -10,7 +10,12 @@ def user_similarity(user1_ratings, user2_ratings) -> float:
     :param user2_ratings: Series of ratings with index = item_id
     :return:
     """
-    pass
+    merged = pd.merge(user1_ratings, user2_ratings, left_index=True, right_index=True, suffixes=('_1', '_2'),
+                      how='inner')
+    if merged.empty:
+        return 0.0
+    c = 1 - correlation(merged['rating_1'], merged['rating_2'])
+    return c
 
 class UserKNN:
 
