@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
+from recommendation_algorithms.abstract_recommender import AbstractRecommender
 
-class MatrixFactorizationSGD:
+class MatrixFactorizationSGD(AbstractRecommender):
     """
     Matrix Factorization for rating prediction using Stochastic Gradient Descent (SGD).
 
@@ -24,7 +25,10 @@ class MatrixFactorizationSGD:
         self.item_bias = None
         self.global_mean = None
 
-    def fit(self, ratings: pd.DataFrame, verbose=True):
+    def get_name(self) -> str:
+        return "Matrix Factorization"
+
+    def train(self, ratings: pd.DataFrame):
         """
         Train the model.
 
@@ -54,7 +58,7 @@ class MatrixFactorizationSGD:
                          for u, i, r in zip(ratings['user_id'], ratings['item_id'], ratings['rating'])]
 
         # SGD loop
-        for epoch in range(self.n_epochs):
+        for _ in range(self.n_epochs):
             np.random.shuffle(training_data)
             total_error = 0
 
@@ -77,13 +81,9 @@ class MatrixFactorizationSGD:
                     self.user_bias[u] += self.learning_rate * (err - self.regularization * self.user_bias[u])
                     self.item_bias[i] += self.learning_rate * (err - self.regularization * self.item_bias[i])
 
-            rmse = np.sqrt(total_error / len(training_data))
-            if verbose:
-                print(f"Epoch {epoch + 1}/{self.n_epochs} - RMSE: {rmse:.4f}")
-
         return self
 
-    def predict_single(self, user_id, item_id):
+    def predict_score(self, user_id, item_id):
         """Predict rating for a single (user, item) pair"""
         if user_id not in self.user_mapping or item_id not in self.item_mapping:
             return np.nan
@@ -139,3 +139,4 @@ class MatrixFactorizationSGD:
         top_scores = scores[top_idx]
 
         return list(zip(top_items, top_scores))
+    
