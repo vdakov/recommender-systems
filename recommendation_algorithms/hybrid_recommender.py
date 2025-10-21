@@ -1,24 +1,28 @@
 from datetime import datetime
-from typing import List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence
 from recommendation_algorithms.abstract_recommender import AbstractRecommender
+from recommendation_algorithms.five_recommender import FiveRecommender
 from recommendation_algorithms.matrix_factorization import MatrixFactorizationSGD
 import numpy as np
 import pandas as pd
-import itertools
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
+from sklearn.metrics import mean_squared_error
 import os
+
 
 class HybridRecommender:
     recommenders: List[AbstractRecommender]
     weights: List[float]  # Each weight corresponds to a recommender
-    predicted_scores = pd.DataFrame
     verbose: bool
+    predictions: pd.DataFrame # Precomputed predictions for all user/item pairs
 
     def __init__(self, training_path: str, verbose=False):
         # TODO fill list of recommenders
         matrix_factorization = MatrixFactorizationSGD()
-        self.recommenders = [matrix_factorization]
+        five_recommender = FiveRecommender() # TODO remove
+        self.recommenders = [matrix_factorization, five_recommender]
+        self.predictions = {} # For each recommender, keep a dataframe of precompute 
         self.weights = []
         self.verbose = verbose
         self.train(training_path)
@@ -34,6 +38,7 @@ class HybridRecommender:
             print(f'Training individual models...')
         for recommender in self.recommenders:
             recommender.train(train_data)
+            recommender.calculate_all_predictions(train_data)
         if self.verbose:
             print(f'Finished training individual models.')
             print('Started linear regression...')
@@ -44,16 +49,20 @@ class HybridRecommender:
             print(f'Finished linear regression, weights are:')
             for i in range(len(self.recommenders)):
                 print(f'  {self.recommenders[i].get_name()}: {self.weights[i]}')
-            print(f'Filling prediction dataframe...')
-        # Predict score for each u/i pair for each model, so aggregated dataframe can be created for ranking prediction
-        user_ids = train_data['user_id'].unique()
-        item_ids = train_data['item_id'].unique()
-        pairs = list(itertools.product(user_ids, item_ids))
-        self.predicted_scores = pd.DataFrame(pairs, columns=['user_id', 'item_id'])
-        
-        self.predicted_scores['predicted_score'] = self.predicted_scores.apply(lambda x : self._predict_score_with_weights(x['user_id'], x['item_id'], self.weights), axis=1)
-        if self.verbose:
-            print('Finished prediction dataframe, hybrid model is ready to use!')
+
+        # Precompute all predictions
+        print(f"Precomputing predictions...")
+        dfs = []
+        for df, w in zip([r.predictions for r in self.recommenders], self.weights):
+            temp = df.copy()
+            temp['weighted_score'] = temp['predicted_score'] * w
+            dfs.append(temp[['user_id', 'item_id', 'weighted_score']])
+        combined = pd.concat(dfs, ignore_index=True)
+        self.predictions = (
+            combined.groupby(['user_id', 'item_id'], as_index=False, sort=False)
+                    .agg(predicted_score=('weighted_score', 'sum'))
+        )
+        print("Finished computing predictions, model is ready to use.")
 
     def linear_regression(
         self,
@@ -73,17 +82,34 @@ class HybridRecommender:
         last_f = {'val': None}  # mutable enclosure for reuse in callback
         iter_count = {'k': 0}
 
-        def mse(weights: List[float]):
-            y_pred = train_data.apply(
-                lambda x: self._predict_score_with_weights(x['user_id'], x['item_id'], weights),
-                axis=1
-            ).to_numpy()
-            y_true = train_data['rating'].to_numpy()
-            errors = y_true - y_pred
-            val = np.dot(errors, errors) / len(errors)
-            last_f['val'] = val  # cache for callback
-            return val
+        # Objective function to optimize (MSE)
+        def objective(weights: List[float]):
+            # Find weighted sum of predictions
+            dfs = []
+            for df, w in zip([r.predictions for r in self.recommenders], weights):
+                temp = df.copy()
+                temp['weighted_score'] = temp['predicted_score'] * w
+                dfs.append(temp[['user_id', 'item_id', 'weighted_score']])
+            combined = pd.concat(dfs, ignore_index=True)
+            result = (
+                combined.groupby(['user_id', 'item_id'], as_index=False, sort=False)
+                        .agg(predicted_score=('weighted_score', 'sum'))
+            )
+            aligned = ( # Align with GT so that predictions are same length
+                train_data[['user_id', 'item_id']]
+                .merge(result, on=['user_id', 'item_id'], how='left')
+            )
+            y_pred = aligned['predicted_score'].to_numpy()
 
+            # Ground truth
+            y_true = train_data['rating'].to_numpy()
+
+            # Calculate MSE
+            mse = mean_squared_error(y_true, y_pred)
+            last_f['val'] = mse
+            return mse
+
+        # Callback used to keep track of MSE for visualization purposes
         def cb(wk: np.ndarray):
             if not visualize:
                 return
@@ -99,7 +125,7 @@ class HybridRecommender:
             iter_count['k'] = k + 1
 
         # Optimize
-        res = minimize(mse, ws0, method='L-BFGS-B', callback=cb)
+        res = minimize(objective, ws0, method='L-BFGS-B', callback=cb)
         self.weights = res.x
 
         # --- Visualization & save (plot once) ---
@@ -138,14 +164,15 @@ class HybridRecommender:
 
             print(f"[INFO] Visualization saved to: {file_path}")
 
-    def predict_score(self, user_id: int, item_id: int) -> float:
-        df = self.predicted_scores
-        return df.loc[((df['user_id'] == user_id) & (df['item_id'] == item_id)), 'predicted_score'].values[0]
-    
     def _predict_score_with_weights(self, user_id: int, item_id: int, weights: List[float]) -> float:
-        return np.sum([p[0] * p[1].predict_score(user_id, item_id) for p in zip(weights, self.recommenders)])
-        
-    def predict_top_k(self, user_id: int, k: int) -> List[int]:
-        user_df = self.predict_scores[self.predicted_scores['user_id'] == user_id]
-        top_items = user_df.nlargest(k, 'predicted_score')['item_id']
-        return top_items.tolist()
+        return np.sum([p[0] * p[1].get_cached_predicted_score(user_id, item_id) for p in zip(weights, self.recommenders)])
+
+    def predict_score(self, user_id: int, item_id: int) -> float:
+        # Find precomputed prediction
+        return self.predictions.loc[((self.predictions['item_id'] == item_id) & (self.predictions['user_id'] == user_id)), 'predicted_score'].values[0]
+    
+    def predict_ranking(self, user_id: int, k: int) -> List[int]:
+        # Predict ranking based on precomputed scores
+        user_df = self.predictions.loc[(self.predictions['user_id'] == user_id), ['item_id', 'predicted_score']]
+        top_k = user_df.nlargest(k, 'predicted_score')
+        return top_k['item_id'].to_list()

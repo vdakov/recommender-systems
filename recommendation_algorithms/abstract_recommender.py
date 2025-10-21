@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+import itertools
+from typing import Dict, List
 import pandas as pd
 
 
@@ -7,6 +9,7 @@ class AbstractRecommender(ABC):
     Abstract class to represent a recommendation model.
     All models in the hybrid recommender must extend this class and implement its methods.
     """
+    predictions: pd.DataFrame
 
     @abstractmethod
     def train(self, train_data: pd.DataFrame) -> None:
@@ -35,4 +38,15 @@ class AbstractRecommender(ABC):
         :param item_id: The id of the item
         :return: Predicted score
         """
-        pass 
+        pass
+
+    def get_cached_predicted_score(self, user_id: int, item_id: int) -> float:
+        return self.predictions.loc[((self.predictions['user_id'] == user_id) & (self.predictions['item_id'] == item_id)), 'predicted_score'].values[0]
+
+    def calculate_all_predictions(self, train_data: pd.DataFrame) -> None:
+        user_ids = train_data['user_id'].unique()
+        item_ids = train_data['item_id'].unique()
+        pairs = list(itertools.product(user_ids, item_ids))
+        predictions = pd.DataFrame(pairs, columns=['user_id', 'item_id'])
+        predictions['predicted_score'] = predictions.apply(lambda x : self.predict_score(x['user_id'], x['item_id']), axis=1)
+        self.predictions = predictions
