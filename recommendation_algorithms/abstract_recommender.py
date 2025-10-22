@@ -10,6 +10,7 @@ class AbstractRecommender(ABC):
     All models in the hybrid recommender must extend this class and implement its methods.
     """
     predictions: pd.DataFrame
+    rankings: Dict[int, List[(int, float)]]
 
     @abstractmethod
     def train(self, train_data: pd.DataFrame) -> None:
@@ -50,3 +51,19 @@ class AbstractRecommender(ABC):
         predictions = pd.DataFrame(pairs, columns=['user_id', 'item_id'])
         predictions['predicted_score'] = predictions.apply(lambda x : self.predict_score(x['user_id'], x['item_id']), axis=1)
         self.predictions = predictions
+
+    def calculate_all_rankings(self, train_data: pd.DataFrame) -> None:
+        user_ids = train_data['user_id'].unique()
+        self.rankings = {}
+        for user_id in user_ids:
+            user_df = self.predictions.loc[
+                (self.predictions['user_id'] == user_id),
+                ['item_id', 'predicted_score']
+            ]
+
+            top_k = (
+                user_df.nlargest(k, 'predicted_score')
+                .apply(lambda row: (row['item_id'], row['predicted_score']), axis=1)
+                .tolist()
+            )
+            self.rankings[user_id] = top_k

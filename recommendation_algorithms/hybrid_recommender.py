@@ -12,18 +12,19 @@ import os
 
 
 class HybridRecommender:
-    recommenders: List[AbstractRecommender]
-    weights: List[float]  # Each weight corresponds to a recommender
+    rating_recommenders: List[AbstractRecommender]
+    ranking_recommenders: List[AbstractRecommender]
+    rating_weights: List[float]  # Each weight corresponds to a recommender
+    ranking_weights: List[float]  # Each weight corresponds to a recommender
     verbose: bool
     predictions: pd.DataFrame # Precomputed predictions for all user/item pairs
 
-    def __init__(self, training_path: str, verbose=False):
-        # TODO fill list of recommenders
-        matrix_factorization = MatrixFactorizationSGD()
-        five_recommender = FiveRecommender() # TODO remove
-        self.recommenders = [matrix_factorization, five_recommender]
+    def __init__(self, training_path: str, rating_recommenders: List[AbstractRecommender], ranking_recommenders: List[AbstractRecommender], verbose=False):
+        self.rating_recommenders = rating_recommenders
+        self.ranking_recommenders = ranking_recommenders
         self.predictions = {} # For each recommender, keep a dataframe of precompute 
-        self.weights = []
+        self.rating_weights = []
+        self.ranking_weights = []
         self.verbose = verbose
         self.train(training_path)
 
@@ -36,24 +37,30 @@ class HybridRecommender:
         if self.verbose:
             print(f'Started training hybrid recommender on {len(train_data['user_id'].unique())} users and {len(train_data['item_id'].unique())} items...')
             print(f'Training individual models...')
-        for recommender in self.recommenders:
+        trained_recommenders = []
+        for recommender in self.rating_recommenders:
             recommender.train(train_data)
             recommender.calculate_all_predictions(train_data)
+            trained_recommenders.append(recommender.get_name())
+        for recommender in self.ranking_recommenders:
+            if not recommender.get_name() in trained_recommenders:
+                recommender.train(train_data)
+                trained_recommenders.append(recommender.get_name())
         if self.verbose:
             print(f'Finished training individual models.')
             print('Started linear regression...')
 
         # Find weights which minimize MSE
-        self.linear_regression(train_data, visualize=self.verbose)
+        self._linear_regression_rating(train_data, visualize=self.verbose)
         if self.verbose:
             print(f'Finished linear regression, weights are:')
-            for i in range(len(self.recommenders)):
-                print(f'  {self.recommenders[i].get_name()}: {self.weights[i]}')
+            for i in range(len(self.rating_recommenders)):
+                print(f'  {self.rating_recommenders[i].get_name()}: {self.rating_weights[i]}')
 
         # Precompute all predictions
         print(f"Precomputing predictions...")
         dfs = []
-        for df, w in zip([r.predictions for r in self.recommenders], self.weights):
+        for df, w in zip([r.predictions for r in self.rating_recommenders], self.rating_weights):
             temp = df.copy()
             temp['weighted_score'] = temp['predicted_score'] * w
             dfs.append(temp[['user_id', 'item_id', 'weighted_score']])
@@ -64,7 +71,7 @@ class HybridRecommender:
         )
         print("Finished computing predictions, model is ready to use.")
 
-    def linear_regression(
+    def _linear_regression_rating(
         self,
         train_data: pd.DataFrame,
         visualize: bool = False,
@@ -73,7 +80,7 @@ class HybridRecommender:
         max_snapshots: int = 250,          # cap history length
         track_dims: Optional[Sequence[int]] = None  # which weight indices to plot (None = all)
     ):
-        ws0 = np.zeros(len(self.recommenders), dtype=float)
+        ws0 = np.zeros(len(self.rating_recommenders), dtype=float)
 
         mse_history: List[float] = []
         weights_history: List[np.ndarray] = []
@@ -86,7 +93,7 @@ class HybridRecommender:
         def objective(weights: List[float]):
             # Find weighted sum of predictions
             dfs = []
-            for df, w in zip([r.predictions for r in self.recommenders], weights):
+            for df, w in zip([r.predictions for r in self.rating_recommenders], weights):
                 temp = df.copy()
                 temp['weighted_score'] = temp['predicted_score'] * w
                 dfs.append(temp[['user_id', 'item_id', 'weighted_score']])
@@ -126,7 +133,7 @@ class HybridRecommender:
 
         # Optimize
         res = minimize(objective, ws0, method='L-BFGS-B', callback=cb)
-        self.weights = res.x
+        self.rating_weights = res.x
 
         # --- Visualization & save (plot once) ---
         if visualize and len(mse_history) > 0:
@@ -165,7 +172,7 @@ class HybridRecommender:
             print(f"[INFO] Visualization saved to: {file_path}")
 
     def _predict_score_with_weights(self, user_id: int, item_id: int, weights: List[float]) -> float:
-        return np.sum([p[0] * p[1].get_cached_predicted_score(user_id, item_id) for p in zip(weights, self.recommenders)])
+        return np.sum([p[0] * p[1].get_cached_predicted_score(user_id, item_id) for p in zip(weights, self.rating_recommenders)])
 
     def predict_score(self, user_id: int, item_id: int) -> float:
         # Find precomputed prediction
