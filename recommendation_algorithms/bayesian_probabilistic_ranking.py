@@ -1,18 +1,23 @@
+from typing import Dict, List
 import pandas as pd
 import numpy as np
 from recommendation_algorithms.abstract_recommender import AbstractRecommender
 from tqdm import tqdm 
+
 class BayesianProbabilisticRanking(AbstractRecommender):
+    rankings: Dict[int, List[tuple[int, float]]]
+    
     """
     BPR implementation of the MF algorithm.
     """
-
-    def __init__(self, n_factors=20, learning_rate=0.01, regularization=0.02, n_epochs=20, num_samples_per_epoch=1000):
+    #def __init__(self, n_factors=20, learning_rate=0.01, regularization=0.02, n_epochs=20, num_samples_per_epoch=1000):
+    def __init__(self, n_factors=20, learning_rate=0.01, regularization=0.02, n_epochs=5, num_samples_per_epoch=100):
         self.n_factors = n_factors
         self.learning_rate = learning_rate
         self.regularization = regularization
         self.n_epochs = n_epochs
         self.losses = []
+        self.rankings = {}
         self.num_samples_per_epoch = num_samples_per_epoch
 
         # Model parameters
@@ -20,6 +25,7 @@ class BayesianProbabilisticRanking(AbstractRecommender):
         self.Q = None  # Item latent factors
         self.item_bias = None
         self.global_mean = None
+        self.use_bias = False # TODO what is this?
 
     def get_name(self) -> str:
         return "Bayesian Probabilistic Ranking"
@@ -43,15 +49,14 @@ class BayesianProbabilisticRanking(AbstractRecommender):
 
         return expanded
 
-    def train(self, ratings: pd.DataFrame):
+    def train(self, train_data: pd.DataFrame):
         """
         Train the model.
 
         Args:
             ratings (pd.DataFrame): dataframe with [user_id, item_id, rating] 
         """
-        ratings = self.expand_dataframe(ratings)
-
+        ratings = self.expand_dataframe(train_data)
         
         self.user_mapping = {u: i for i, u in enumerate(ratings['user_id'].unique())}
         self.item_mapping = {i: j for j, i in enumerate(ratings['item_id'].unique())}
@@ -65,8 +70,6 @@ class BayesianProbabilisticRanking(AbstractRecommender):
         # Initialize factors
         self.P = np.random.normal(0, 1, (n_users, self.n_factors))
         self.Q = np.random.normal(0, 1, (n_items, self.n_factors))
-
-    
 
         # SGD loop
         for _ in tqdm(range(self.n_epochs)):
@@ -85,7 +88,6 @@ class BayesianProbabilisticRanking(AbstractRecommender):
                 x_uij_hat = x_ui - x_uj
                 x_uij = r_ui - r_uj
                 
-  
                 P_u = self.P[u - 1]
                 Q_i = self.Q[i - 1]
                 Q_j = self.Q[j - 1]
@@ -103,7 +105,7 @@ class BayesianProbabilisticRanking(AbstractRecommender):
 
         return self
 
-    def predict_score(self, user_id, item_id):
+    def predict_score(self, user_id: int, item_id: int) -> float:
         """Predict rating for a single (user, item) pair"""
         if user_id not in self.user_mapping or item_id not in self.item_mapping:
             return np.nan
@@ -122,7 +124,6 @@ class BayesianProbabilisticRanking(AbstractRecommender):
         x_uij_hat = x_ui - x_uj
         return np.signum(x_uij_hat)
     
-
     def predict(self, test_data):
         """Predict ratings for a test dataframe with [user_id, item_id]"""
         preds = []
@@ -162,8 +163,13 @@ class BayesianProbabilisticRanking(AbstractRecommender):
 
         # Get top-K items
         top_idx = np.argsort(scores)[::-1][:n]
-        top_items = [self.item_inv[i] for i in top_idx]
+        top_items = [int(self.item_inv[i]) for i in top_idx]
         top_scores = scores[top_idx]
 
         return list(zip(top_items, top_scores))
     
+    # Override as it works differently from the rating prediction rankers
+    def calculate_all_rankings(self, k: int, train_data: pd.DataFrame) -> None:
+        for user_id in train_data['user_id'].unique():
+            ranking = self.recommend_topk(user_id, train_data, k)
+            self.rankings[user_id] = ranking

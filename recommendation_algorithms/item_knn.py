@@ -116,17 +116,3 @@ class ItemKNN(AbstractRecommender):
         denominator = sims.abs().sum()
 
         return numerator / denominator if denominator != 0 else 0.0
-
-    def predict_ranking(self, target_user, n: int = 10) -> list:
-        """
-        Predict top-n item recommendations for a given user.
-
-        Parameters:
-        :param target_user: user id
-        :param n: number of recommendations
-
-        Returns:
-        :return: List of tuples: [(item_id, predicted_rating), ...]
-        """
-        # TODO
-        pass
