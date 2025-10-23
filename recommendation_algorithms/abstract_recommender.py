@@ -10,7 +10,7 @@ class AbstractRecommender(ABC):
     All models in the hybrid recommender must extend this class and implement its methods.
     """
     predictions: pd.DataFrame
-    rankings: Dict[int, List[(int, float)]]
+    rankings: Dict[int, List[tuple[int, float]]]
 
     @abstractmethod
     def train(self, train_data: pd.DataFrame) -> None:
@@ -42,9 +42,21 @@ class AbstractRecommender(ABC):
         pass
 
     def get_cached_predicted_score(self, user_id: int, item_id: int) -> float:
+        """
+        Lookup precomputed score a user is predicted to give an item.
+    
+        :param user_id: Id of the user
+        :param item_id: Id of the item
+        :returns: Predicted score
+        """
         return self.predictions.loc[((self.predictions['user_id'] == user_id) & (self.predictions['item_id'] == item_id)), 'predicted_score'].values[0]
 
     def calculate_all_predictions(self, train_data: pd.DataFrame) -> None:
+        """
+        Calculate and save all rating predictions (each user/item pair) in the training data.
+
+        :param train_data: Training data containing user_ids and item_ids
+        """
         user_ids = train_data['user_id'].unique()
         item_ids = train_data['item_id'].unique()
         pairs = list(itertools.product(user_ids, item_ids))
@@ -52,7 +64,13 @@ class AbstractRecommender(ABC):
         predictions['predicted_score'] = predictions.apply(lambda x : self.predict_score(x['user_id'], x['item_id']), axis=1)
         self.predictions = predictions
 
-    def calculate_all_rankings(self, train_data: pd.DataFrame) -> None:
+    def calculate_all_rankings(self, k: int, train_data: pd.DataFrame) -> None:
+        """
+        For each user in the training data, calculate the predicted ranking and save it.
+
+        :param k: Ranking list size
+        :param train_data: Training data containing user ids
+        """
         user_ids = train_data['user_id'].unique()
         self.rankings = {}
         for user_id in user_ids:
@@ -67,3 +85,14 @@ class AbstractRecommender(ABC):
                 .tolist()
             )
             self.rankings[user_id] = top_k
+
+    def get_ranking(self, user_id: int, k: int) -> List[tuple[int, float]]:
+        """
+        Lookup precomputed ranking for a user.
+
+        :param user_id: Id of the user
+        :param k: Maximum size of recommendation list
+        :returns: List of pairs of item_ids and scores (ordered descending)
+        """
+        return self.rankings[user_id][:k]
+    

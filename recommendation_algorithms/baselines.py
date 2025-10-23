@@ -91,7 +91,7 @@ class RandomRanker(AbstractRecommender):
         raise ValueError("Predicting score not implemented for ranker")
     
     def predict_ranking(self, user_id: int, k: int) -> List[int]:
-        # Randomly recommend 10 unseen items (items not interacted by the target user in training data) to each user
+        # Randomly recommend unseen items (items not interacted by the target user in training data) to each user
         unseen_items = self.unseen_items[user_id]
         return random.sample(unseen_items, k)
 
