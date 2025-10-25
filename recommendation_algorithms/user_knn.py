@@ -45,7 +45,7 @@ class UserKNN(AbstractRecommender):
         self.fit = False
 
     def get_name(self) -> str:
-        return 'User-based Collaborative Filtering (k-NN)'
+        return 'User KNN'
 
     def train(self, train_data: pd.DataFrame) -> None:
         self.train_data = train_data

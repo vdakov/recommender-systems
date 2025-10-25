@@ -40,7 +40,7 @@ class ItemKNN(AbstractRecommender):
         self.fit = False
 
     def get_name(self) -> str:
-        return 'Item-based Collaborative Filtering (k-NN)'
+        return 'Item KNN'
 
     def train(self, train_data: pd.DataFrame) -> None:  # TODO: may add another field containing sorted list for each item? should give speed-ups w/ continued use
         self.train_data = train_data
