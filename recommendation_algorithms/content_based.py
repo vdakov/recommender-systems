@@ -26,7 +26,6 @@ class ContentBasedRecommender(AbstractRecommender):
         
     def train(self, content, train_data, batch_size, aggregation_method):
         self.train_embeddings(self.bert_model_name, content, batch_size)
-        print(train_data["item_id"].unique())
         self.aggregation_method = aggregation_method
         predicted_ratings = train_data.apply(
             lambda row: self.predict_computability_between_user_and_item(
@@ -67,14 +66,9 @@ class ContentBasedRecommender(AbstractRecommender):
         print(f"Using cuda or cpu: {device}")
         model.to(device)
         model.eval()
-
-        print(f"Using device: {device}")
-
         emb = []
 
-        for i in range(0, len(content), batch_size):
-            if i % (batch_size * 10) == 0:
-                print(f"Processing batch {i//batch_size + 1}/{len(content)//batch_size + 1}")
+        for i in tqdm(range(0, len(content), batch_size)):
 
             batch_texts = content[i:i + batch_size]
 
