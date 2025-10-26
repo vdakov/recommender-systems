@@ -109,8 +109,8 @@ class ContentBasedRecommender(AbstractRecommender):
     def get_items_per_user_with_rating(self, user_id):
         mask = self.data["user_id"] == user_id
         user_data = self.data.loc[mask, ["item_id", "rating"]]
-        ratings = user_data["rating"]
-        embeddings = user_data["item_id"].apply(lambda x: self.get_item_emb(x))
+        ratings = user_data["rating"].to_numpy()
+        embeddings = np.stack(user_data["item_id"].apply(lambda x: self.get_item_emb(x)))
         
         return embeddings, ratings
     
@@ -119,13 +119,17 @@ class ContentBasedRecommender(AbstractRecommender):
         user_representation = []
         
         if self.aggregation_method == "average":
-            user_representation = np.mean(embeddings)
+            user_representation = np.mean(embeddings, axis=0)
         elif self.aggregation_method == "weighted_average":
-            user_representation = np.dot(ratings, embeddings)
-            user_representation = np.divide(user_representation, np.sum(ratings))
+            weighted = [e * r for e, r in zip(embeddings, ratings)]
+            rating_sum = np.sum(ratings)
+            user_representation = np.sum(weighted, axis=0) / rating_sum
         elif self.aggregation_method ==  "avg_pos":
             embeddings_filtered = [emb for (emb, rat) in zip(embeddings, ratings) if rat >= 4]
-            user_representation = np.mean(embeddings_filtered)
+            if(len(embeddings_filtered) > 0):
+                user_representation = np.mean(embeddings_filtered, axis=0)
+            else: 
+                user_representation = np.zeros(embeddings[0].shape)
             
         
         return user_representation
@@ -142,6 +146,7 @@ class ContentBasedRecommender(AbstractRecommender):
         user_emb = self.get_user_emb(user_id)
         item_emb = self.get_item_emb(item_id)
         similarity = np.dot(user_emb, item_emb)
+        
         
         return similarity
     
