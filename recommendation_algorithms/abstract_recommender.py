@@ -4,7 +4,9 @@ import os
 from typing import Dict, List
 import pandas as pd
 import json
-from tqdm import tqdm
+from tqdm import tqdm, tqdm_pandas
+
+
 
 class AbstractRecommender(ABC):
     """
@@ -59,6 +61,7 @@ class AbstractRecommender(ABC):
 
         :param train_data: Training data containing user_ids and item_ids
         """
+        tqdm.pandas()
         user_ids = train_data['user_id'].unique()
         item_ids = train_data['item_id'].unique()
         pairs = list(itertools.product(user_ids, item_ids))
@@ -73,6 +76,7 @@ class AbstractRecommender(ABC):
         :param k: Ranking list size
         :param train_data: Training data containing user ids
         """
+        tqdm.pandas()
         user_ids = train_data['user_id'].unique()
         self.rankings = {}
         for user_id in tqdm(user_ids):
