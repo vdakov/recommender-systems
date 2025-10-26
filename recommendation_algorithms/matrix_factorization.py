@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
+import itertools 
 from recommendation_algorithms.abstract_recommender import AbstractRecommender
 
 class MatrixFactorizationSGD(AbstractRecommender):
@@ -28,13 +30,14 @@ class MatrixFactorizationSGD(AbstractRecommender):
     def get_name(self) -> str:
         return "Matrix Factorization"
 
-    def train(self, ratings: pd.DataFrame):
+    def train(self, train_data: pd.DataFrame):
         """
         Train the model.
 
         Args:
             ratings (pd.DataFrame): dataframe with [user_id, item_id, rating]
         """
+        ratings = train_data["rating"]
         # Map IDs to indices
         self.user_mapping = {u: i for i, u in enumerate(ratings['user_id'].unique())}
         self.item_mapping = {i: j for j, i in enumerate(ratings['item_id'].unique())}
@@ -95,12 +98,27 @@ class MatrixFactorizationSGD(AbstractRecommender):
         if self.use_bias:
             pred += self.global_mean + self.user_bias[u] + self.item_bias[i]
         return pred
+    
+    
+    def calculate_all_predictions(self, train_data: pd.DataFrame) -> None:
+        """
+        Calculate and save all rating predictions (each user/item pair) in the training data.
+
+        :param train_data: Training data containing user_ids and item_ids
+        """
+        tqdm.pandas()
+        user_ids = train_data['user_id'].unique()
+        item_ids = train_data['item_id'].unique()
+        pairs = list(itertools.product(user_ids, item_ids))
+        predictions = pd.DataFrame(pairs, columns=['user_id', 'item_id'])
+        predictions['predicted_score'] = predictions.apply(lambda x : self.predict_score(x['user_id'], x['item_id']), axis=1)
+        self.predictions = predictions
 
     def predict(self, test_data):
         """Predict ratings for a test dataframe with [user_id, item_id]"""
         preds = []
         for u, i in zip(test_data['user_id'], test_data['item_id']):
-            preds.append(self.predict_single(u, i))
+            preds.append(self.predict_score(u, i))
         return np.array(preds)
 
     def recommend_topk(self, user_id, train_data, n=10, exclude_seen=True):
@@ -140,3 +158,9 @@ class MatrixFactorizationSGD(AbstractRecommender):
 
         return list(zip(top_items, top_scores))
     
+    
+    # Override as it works differently from the rating prediction rankers
+    def calculate_all_rankings(self, k: int, train_data: pd.DataFrame) -> None:
+        for user_id in train_data['user_id'].unique():
+            ranking = self.recommend_topk(user_id, train_data, k)
+            self.rankings[user_id] = ranking
