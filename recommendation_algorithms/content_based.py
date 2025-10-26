@@ -1,35 +1,39 @@
-import itertools
 import torch
 import pandas as pd
 import numpy as np
+from typing import List
+from tqdm import tqdm 
 from transformers import AutoTokenizer, AutoModel
-from typing import Dict, List
 from recommendation_algorithms.abstract_recommender import AbstractRecommender
 
 class ContentBasedRecommender(AbstractRecommender):
     """
     Content-based recommender based on embeddings from BERT.
     """
-    item_embeddings: np.array(np.array(int))
-    bert_model_name: str
+    item_embeddings: np.array
+    bert_model: str
     data: pd.DataFrame
-    predicted_ratings: np.array(int)
+    predicted_ratings: np.array
     min_val: float
     max_val: float
     aggregation_method: str
     
-    def __init__(self, bert_model_name:str, data:pd.DataFrame()):
+    def __init__(self, bert_model:str, data:pd.DataFrame, embedding_dimension:int, batch_size:int, aggregation_method:str, content:List[str]):
         super().__init__()
         self.item_embeddings = []
-        self.bert_model_name = bert_model_name
+        self.bert_model = bert_model
         self.data = data
-        
-    def train(self, content, train_data, batch_size, aggregation_method):
-        self.train_embeddings(self.bert_model_name, content, batch_size)
+        self.embedding_dimension = embedding_dimension 
+        self.batch_size = batch_size
         self.aggregation_method = aggregation_method
+        self.content = content
+        
+    def train(self, train_data):
+        self.train_embeddings(self.bert_model, self.content, self.embedding_dimension, self.batch_size,)
+
         predicted_ratings = train_data.apply(
             lambda row: self.predict_computability_between_user_and_item(
-                row["user_id"], row["item_id"], aggregation_method
+                row["user_id"], row["item_id"]
             ),
             axis=1
             )
@@ -38,10 +42,9 @@ class ContentBasedRecommender(AbstractRecommender):
         self.predicted_ratings = preds
         self.min_val = np.min(preds)
         self.max_val = np.max(preds)
-        self.aggregation_method = aggregation_method
         
 
-    def train_embeddings(self, model_name:str, content:pd.DataFrame, batch_size:int) -> None:
+    def train_embeddings(self, model_name:str, content:pd.DataFrame, batch_size:int, embedding_dimension:int) -> None:
         """
         This method prepares the model for usage, in this case this means loading it 
         with content embeddings.
@@ -77,7 +80,7 @@ class ContentBasedRecommender(AbstractRecommender):
                 batch_texts,
                 padding=True,
                 truncation=True,
-                max_length=512,
+                max_length=embedding_dimension,
                 return_tensors='pt'
             )
 
@@ -135,7 +138,7 @@ class ContentBasedRecommender(AbstractRecommender):
         """
         return "Content-Based Recommender Using BERT Embeddings"
     
-    def predict_computability_between_user_and_item(self, user_id, item_id, aggregation_method):
+    def predict_computability_between_user_and_item(self, user_id, item_id):
         user_emb = self.get_user_emb(user_id)
         item_emb = self.get_item_emb(item_id)
         similarity = np.dot(user_emb, item_emb)
@@ -151,63 +154,6 @@ class ContentBasedRecommender(AbstractRecommender):
         :param item_id: The id of the item
         :return: Predicted score
         """
-        rating = self.predict_computability_between_user_and_item(user_id, item_id, self.aggregation_method)
-        normalized = 1 + (rating - self.min_val) * (4 / (self.max_val - self.min_val))
-        return normalized
-    
-
-    def get_cached_predicted_score(self, user_id: int, item_id: int) -> float:
-        """
-        Lookup precomputed score a user is predicted to give an item.
-    
-        :param user_id: Id of the user
-        :param item_id: Id of the item
-        :returns: Predicted score
-        """
-        return self.predictions.loc[((self.predictions['user_id'] == user_id) & (self.predictions['item_id'] == item_id)), 'predicted_score'].values[0]
-
-    def calculate_all_predictions(self, train_data: pd.DataFrame) -> None:
-        """
-        Calculate and save all rating predictions (each user/item pair) in the training data.
-
-        :param train_data: Training data containing user_ids and item_ids
-        """
-        user_ids = train_data['user_id'].unique()
-        item_ids = train_data['item_id'].unique()
-        pairs = list(itertools.product(user_ids, item_ids))
-        predictions = pd.DataFrame(pairs, columns=['user_id', 'item_id'])
-        predictions['predicted_score'] = predictions.apply(lambda x : self.predict_score(x['user_id'], x['item_id']), axis=1)
-        self.predictions = predictions
-
-    def calculate_all_rankings(self, k: int, train_data: pd.DataFrame) -> None:
-        """
-        For each user in the training data, calculate the predicted ranking and save it.
-
-        :param k: Ranking list size
-        :param train_data: Training data containing user ids
-        """
-        user_ids = train_data['user_id'].unique()
-        self.rankings = {}
-        for user_id in user_ids:
-            user_df = self.predictions.loc[
-                (self.predictions['user_id'] == user_id),
-                ['item_id', 'predicted_score']
-            ]
-
-            top_k = (
-                user_df.nlargest(k, 'predicted_score')
-                .apply(lambda row: (row['item_id'], row['predicted_score']), axis=1)
-                .tolist()
-            )
-            self.rankings[user_id] = top_k
-
-    def get_ranking(self, user_id: int, k: int) -> List[tuple[int, float]]:
-        """
-        Lookup precomputed ranking for a user.
-
-        :param user_id: Id of the user
-        :param k: Maximum size of recommendation list
-        :returns: List of pairs of item_ids and scores (ordered descending)
-        """
-        return self.rankings[user_id][:k]
-    
+        score = self.predict_computability_between_user_and_item(user_id, item_id)
+        rating = 1 + (score - self.min_val) * (4 / (self.max_val - self.min_val))
+        return rating

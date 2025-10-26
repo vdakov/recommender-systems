@@ -45,7 +45,7 @@ class ItemKNN(AbstractRecommender):
     def train(self, train_data: pd.DataFrame) -> None:  # TODO: may add another field containing sorted list for each item? should give speed-ups w/ continued use
         self.train_data = train_data
         self.item_ids = list(self.train_data['item_id'].unique())  # items in training data
-
+        
         # Get similarity matrix
         self.similarity_matrix = pd.DataFrame(np.zeros((len(self.item_ids), len(self.item_ids))), index=self.item_ids,
                                               columns=self.item_ids)
