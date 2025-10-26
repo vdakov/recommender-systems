@@ -23,7 +23,7 @@ def grid_search(hyperparameter_dict: dict, recommendation_algorithm:AbstractReco
         recommendation_algorithm_curr.calculate_all_predictions(train_data)
         score = metric(recommendation_algorithm_curr.predictions["predicted_score"], train_data["rating"])
         params.append((score, grid))
-        print("Parameters", grid, "with metric:", score)
+        print("Parameters","with metric:", score)
         if score < best_params_score: 
             best_params = grid
             
@@ -32,4 +32,4 @@ def grid_search(hyperparameter_dict: dict, recommendation_algorithm:AbstractReco
     print("Best params:", best_params)
 
             
-    return best_config
+    return best_config, params
