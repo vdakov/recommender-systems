@@ -37,7 +37,7 @@ class MatrixFactorizationSGD(AbstractRecommender):
         Args:
             ratings (pd.DataFrame): dataframe with [user_id, item_id, rating]
         """
-        ratings = train_data["rating"]
+        ratings = train_data
         # Map IDs to indices
         self.user_mapping = {u: i for i, u in enumerate(ratings['user_id'].unique())}
         self.item_mapping = {i: j for j, i in enumerate(ratings['item_id'].unique())}
@@ -161,6 +161,7 @@ class MatrixFactorizationSGD(AbstractRecommender):
     
     # Override as it works differently from the rating prediction rankers
     def calculate_all_rankings(self, k: int, train_data: pd.DataFrame) -> None:
+        self.rankings = {}
         for user_id in train_data['user_id'].unique():
             ranking = self.recommend_topk(user_id, train_data, k)
             self.rankings[user_id] = ranking

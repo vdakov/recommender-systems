@@ -102,58 +102,66 @@ class AbstractRecommender(ABC):
         """
         return self.rankings[user_id][:k]
     
-    def _get_predictions_file_path(self) -> str:
+    def _get_predictions_file_path(self, is_test: bool = False) -> str:
         """
         Get the file path for storing/loading precomputed predictions.
 
+        :param is_test: Whether to use the test or train folder
         :return: File path as string
         """
-        folder_path = os.path.join('model_checkpoints', self.get_name().replace(" ", "_").lower())
+        folder_path = os.path.join(f'model_checkpoints/{"test" if is_test else "train"}', self.get_name().replace(" ", "_").lower())
         filepath = os.path.join(folder_path, 'predictions.csv')
         os.makedirs(folder_path, exist_ok=True)
         return filepath
 
-    def _get_ranking_predictions_file_path(self) -> str:
+    def _get_ranking_predictions_file_path(self, is_test: bool = False) -> str:
         """
         Get the folder path to which rankings can be saved.
 
+        :param is_test: Whether to use the test or train folder
         :return: File path as string
         """
-        folder_path = os.path.join('model_checkpoints', self.get_name().replace(" ", "_").lower())
+        folder_path = os.path.join(f'model_checkpoints/{"test" if is_test else "train"}', self.get_name().replace(" ", "_").lower())
         filepath = os.path.join(folder_path, 'rankings')
         os.makedirs(filepath, exist_ok=True)
         return filepath
-    
-    def checkpoint_exists(self) -> bool:
+
+    def checkpoint_exists(self, is_test: bool = False) -> bool:
         """
         Check if a checkpoint file for predictions exists.
 
+        :param is_test: Whether to check in the test or train folder
         :return: True if the checkpoint file exists, False otherwise
         """
-        return os.path.isfile(self._get_predictions_file_path())
+        return os.path.isfile(self._get_predictions_file_path(is_test=is_test))
 
-    def load_predictions_from_file(self) -> None:
+    def load_predictions_from_file(self, is_test: bool = False) -> None:
         """
         Load precomputed predictions from a CSV file.
 
-        :param filepath: Path to the CSV file containing predictions
+        :param is_test: Whether to load from the test or train folder
         """
-        self.predictions = pd.read_csv(self._get_predictions_file_path())
+        if is_test:
+            self.test_predictions = pd.read_csv(self._get_predictions_file_path(is_test=True))
+        else:
+            self.predictions = pd.read_csv(self._get_predictions_file_path(is_test=False))
 
-    def save_predictions_to_file(self) -> None:
+    def save_predictions_to_file(self, is_test: bool = False) -> None:
         """
         Save precomputed predictions to a CSV file.
 
-        :param filepath: Path to the CSV file to save predictions
+        :param is_test: Whether to save to the test or train folder
         """
-        self.predictions.to_csv(self._get_predictions_file_path(), index=False)
+        self.predictions.to_csv(self._get_predictions_file_path(is_test=is_test), index=False)
 
 
-    def save_rankings_to_file(self) -> None:
+    def save_rankings_to_file(self, is_test: bool = False) -> None:
         """
         Save precomputed rankings to a set of CSV files and a JSON mapping file.
+
+        :param is_test: Whether to save to the test or train folder
         """
-        folder_path = self._get_ranking_predictions_file_path()
+        folder_path = self._get_ranking_predictions_file_path(is_test=is_test)
         user_dict = {}
 
         for user_id, ranking in self.rankings.items():
@@ -164,3 +172,24 @@ class AbstractRecommender(ABC):
 
         with open(os.path.join(folder_path, 'user_ranking_file_map.json'), 'w') as f:
             json.dump(user_dict, f, indent=4)
+
+    def calculate_rating_predictions_test_data(self, test_data: pd.DataFrame) -> None:
+        """
+        Calculate all predictions and rankings for the test data.
+
+        :param test_data: Test data containing user_ids and item_ids
+        """
+        self.calculate_all_predictions(test_data)
+        self.save_predictions_to_file(is_test=True)
+        print("Calculated and saved predictions for test data.")
+
+    def calculate_ranking_predictions_test_data(self, test_data: pd.DataFrame, k: int) -> None:
+        """
+        Calculate all predictions and rankings for the test data.
+
+        :param test_data: Test data containing user_ids and item_ids
+        :param k: Ranking list size
+        """
+        self.calculate_all_rankings(k, test_data)
+        self.save_rankings_to_file(is_test=True)
+        print("Calculated and saved predictions and rankings for test data.")
