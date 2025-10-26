@@ -29,7 +29,7 @@ def grid_search(hyperparameter_dict: dict, recommendation_algorithm:AbstractReco
         recommendation_algorithm_curr.calculate_all_predictions(train_data)
         score = metric(recommendation_algorithm_curr.predictions["predicted_score"], train_data["rating"])
         params.append((score, grid))
-        print("Parameters", [(k, params[k]) for k in best_params.keys() if (k != "data" and k!= "content")], "with metric:", score)
+        print("Parameters", [(k, grid[k]) for k in grid.keys() if (k != "data" and k!= "content")], "with metric:", score)
         if score < best_params_score: 
             best_params = grid
             best_params_score = score

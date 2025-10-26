@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from scipy.spatial.distance import cosine
+from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
+from scipy.spatial.distance import correlation
 
 from recommendation_algorithms.abstract_recommender import AbstractRecommender
 
@@ -25,7 +27,7 @@ def item_similarity(item1_ratings, item2_ratings) -> float:
 
 class ItemKNN(AbstractRecommender):
 
-    def __init__(self, k: int = 5):
+    def __init__(self, k: int = 5, similarity="cosine"):
         """
         Initialize the ItemKNN model.
 
