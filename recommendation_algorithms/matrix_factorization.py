@@ -13,7 +13,7 @@ class MatrixFactorizationSGD(AbstractRecommender):
     Rating matrix R ≈ P × Q^T + biases
     """
 
-    def __init__(self, n_factors=20, learning_rate=0.01, regularization=0.02, n_epochs=20, use_bias=True):
+    def __init__(self, n_factors=20, learning_rate=0.01, regularization=0.02, n_epochs=20, use_bias=True,):
         self.n_factors = n_factors
         self.learning_rate = learning_rate
         self.regularization = regularization

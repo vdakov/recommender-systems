@@ -137,7 +137,6 @@ class ContentBasedRecommender(AbstractRecommender):
         item_emb = self.get_item_emb(item_id)
         similarity = np.dot(user_emb, item_emb)
         
-        
         return similarity
     
 
