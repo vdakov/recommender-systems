@@ -3,7 +3,8 @@ import itertools
 import os
 from typing import Dict, List
 import pandas as pd
-
+import json
+from tqdm import tqdm
 
 class AbstractRecommender(ABC):
     """
@@ -74,7 +75,7 @@ class AbstractRecommender(ABC):
         """
         user_ids = train_data['user_id'].unique()
         self.rankings = {}
-        for user_id in user_ids:
+        for user_id in tqdm(user_ids):
             user_df = self.predictions.loc[
                 (self.predictions['user_id'] == user_id),
                 ['item_id', 'predicted_score']
@@ -107,6 +108,17 @@ class AbstractRecommender(ABC):
         filepath = os.path.join(folder_path, 'predictions.csv')
         os.makedirs(folder_path, exist_ok=True)
         return filepath
+
+    def _get_ranking_predictions_file_path(self) -> str:
+        """
+        Get the folder path to which rankings can be saved.
+
+        :return: File path as string
+        """
+        folder_path = os.path.join('model_checkpoints', self.get_name().replace(" ", "_").lower())
+        filepath = os.path.join(folder_path, 'rankings')
+        os.makedirs(filepath, exist_ok=True)
+        return filepath
     
     def checkpoint_exists(self) -> bool:
         """
@@ -131,3 +143,20 @@ class AbstractRecommender(ABC):
         :param filepath: Path to the CSV file to save predictions
         """
         self.predictions.to_csv(self._get_predictions_file_path(), index=False)
+
+
+    def save_rankings_to_file(self) -> None:
+        """
+        Save precomputed rankings to a set of CSV files and a JSON mapping file.
+        """
+        folder_path = self._get_ranking_predictions_file_path()
+        user_dict = {}
+
+        for user_id, ranking in self.rankings.items():
+            ranking_df = pd.DataFrame(ranking, columns=['item_id', 'predicted_score'])
+            filepath = os.path.join(folder_path, f'user_{user_id}_ranking.csv')
+            ranking_df.to_csv(filepath, index=False)
+            user_dict[int(user_id)] = filepath
+
+        with open(os.path.join(folder_path, 'user_ranking_file_map.json'), 'w') as f:
+            json.dump(user_dict, f, indent=4)
