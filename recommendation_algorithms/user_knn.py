@@ -64,6 +64,14 @@ class UserKNN(AbstractRecommender):
                 self.similarity_matrix.loc[user1, user2] = s
                 self.similarity_matrix.loc[user2, user1] = s  # mirror
         self.fit = True
+        
+    def restore_training(self, train_data, similarity_matrix):
+        self.train_data = train_data
+        self.user_ids = list(self.train_data['user_id'].unique())
+        self.user_means = self.train_data.groupby('user_id')['rating'].mean()
+
+        self.similarity_matrix = similarity_matrix
+        self.fit = True
 
     def get_k_neighbors(self, target_user, similarity_matrix: pd.DataFrame = None) -> pd.Series:
         if similarity_matrix is None:
