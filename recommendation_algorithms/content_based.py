@@ -18,18 +18,17 @@ class ContentBasedRecommender(AbstractRecommender):
     max_val: float
     aggregation_method: str
     
-    def __init__(self, bert_model:str, data:pd.DataFrame, embedding_dimension:int, batch_size:int, aggregation_method:str, content:List[str]):
+    def __init__(self, bert_model:str, data:pd.DataFrame, batch_size:int, aggregation_method:str, content:List[str]):
         super().__init__()
         self.item_embeddings = []
         self.bert_model = bert_model
         self.data = data
-        self.embedding_dimension = embedding_dimension 
         self.batch_size = batch_size
         self.aggregation_method = aggregation_method
         self.content = content
         
     def train(self, train_data):
-        self.train_embeddings(self.bert_model, self.content, self.embedding_dimension, self.batch_size,)
+        self.train_embeddings(self.bert_model, self.content, self.batch_size,)
 
         predicted_ratings = train_data.apply(
             lambda row: self.predict_computability_between_user_and_item(
@@ -44,7 +43,7 @@ class ContentBasedRecommender(AbstractRecommender):
         self.max_val = np.max(preds)
         
 
-    def train_embeddings(self, model_name:str, content:pd.DataFrame, batch_size:int, embedding_dimension:int) -> None:
+    def train_embeddings(self, model_name:str, content:pd.DataFrame, batch_size:int) -> None:
         """
         This method prepares the model for usage, in this case this means loading it 
         with content embeddings.
@@ -57,16 +56,10 @@ class ContentBasedRecommender(AbstractRecommender):
         elif isinstance(content, np.ndarray):
             content = content.astype(str).tolist()
 
-
-        print(f"Loading BERT model: {model_name}")
-
-        # Load tokenizer and model
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         model = AutoModel.from_pretrained(model_name)
 
-        # Set device (GPU if available)
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        print(f"Using cuda or cpu: {device}")
         model.to(device)
         model.eval()
         emb = []
@@ -80,7 +73,7 @@ class ContentBasedRecommender(AbstractRecommender):
                 batch_texts,
                 padding=True,
                 truncation=True,
-                max_length=embedding_dimension,
+                max_length=512,
                 return_tensors='pt'
             )
 
@@ -97,9 +90,6 @@ class ContentBasedRecommender(AbstractRecommender):
 
         emb = np.array(emb)
         self.item_embeddings = emb
-
-        print(f"BERT embeddings generated: {emb.shape}")
-        print(f"Embedding dimension: {emb.shape[1]}")
 
         return emb 
     
