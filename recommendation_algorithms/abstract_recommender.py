@@ -136,9 +136,15 @@ class AbstractRecommender(ABC):
         """
         Load precomputed predictions from a CSV file.
 
-        :param filepath: Path to the CSV file containing predictions
         """
         self.predictions = pd.read_csv(self._get_predictions_file_path())
+        
+    def load_ranking_from_file(self) -> None:
+        """
+        Load precomputed rankings from a CSV file.
+
+        """
+        self.ranking = pd.read_csv(self._get_ranking_predictions_file_path())
 
     def save_predictions_to_file(self) -> None:
         """
@@ -147,6 +153,7 @@ class AbstractRecommender(ABC):
         :param filepath: Path to the CSV file to save predictions
         """
         self.predictions.to_csv(self._get_predictions_file_path(), index=False)
+        
 
 
     def save_rankings_to_file(self) -> None:
