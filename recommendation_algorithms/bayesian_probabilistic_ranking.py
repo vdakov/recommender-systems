@@ -56,6 +56,7 @@ class BayesianProbabilisticRanking(AbstractRecommender):
         Args:
             ratings (pd.DataFrame): dataframe with [user_id, item_id, rating] 
         """
+        ratings = train_data["rating"]
         ratings = self.expand_dataframe(train_data)
         
         self.user_mapping = {u: i for i, u in enumerate(ratings['user_id'].unique())}
