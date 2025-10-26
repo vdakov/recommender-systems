@@ -60,6 +60,12 @@ class ItemKNN(AbstractRecommender):
                 self.similarity_matrix.loc[item1, item2] = s
                 self.similarity_matrix.loc[item2, item1] = s
         self.fit = True
+        
+    def restore_training(self, train_data, similarity_matrix):
+        self.train_data = train_data
+        self.item_ids = list(self.train_data['item_id'].unique())  # items in training data
+        self.similarity_matrix = similarity_matrix
+        self.fit = True 
 
     def get_k_neighbors(self, target_item, similarity_matrix: pd.DataFrame = None) -> pd.Series:  # TODO: may add a cache for speed (discuss)
         """

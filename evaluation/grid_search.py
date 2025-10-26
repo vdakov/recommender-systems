@@ -2,11 +2,14 @@ import pandas as pd
 import itertools
 from recommendation_algorithms.abstract_recommender import AbstractRecommender
 from collections.abc import Callable
-from typing import List 
+from typing import List
+
+from recommendation_algorithms.user_knn import UserKNN 
+from recommendation_algorithms.item_knn import ItemKNN 
 
 
 
-def grid_search(hyperparameter_dict: dict, recommendation_algorithm:AbstractRecommender, train_data:pd.DataFrame,  metric: Callable[[List[int], List[int]], dict]) -> dict: 
+def grid_search(hyperparameter_dict: dict, recommendation_algorithm:AbstractRecommender, train_data:pd.DataFrame,  metric: Callable[[List[int], List[int]], dict], similarity_matrix=None) -> dict: 
 
         
     best_config = {}
@@ -19,13 +22,17 @@ def grid_search(hyperparameter_dict: dict, recommendation_algorithm:AbstractReco
     best_params_score = float('inf')
     for grid in gridsearch: 
         recommendation_algorithm_curr = recommendation_algorithm(**grid)
-        recommendation_algorithm_curr.train(train_data)
+        if isinstance(recommendation_algorithm, UserKNN) or isinstance(recommendation_algorithm, ItemKNN) :
+            recommendation_algorithm.restore_training(train_data, similarity_matrix)
+        else:
+            recommendation_algorithm_curr.train(train_data)
         recommendation_algorithm_curr.calculate_all_predictions(train_data)
         score = metric(recommendation_algorithm_curr.predictions["predicted_score"], train_data["rating"])
         params.append((score, grid))
         print("Parameters","with metric:", score)
         if score < best_params_score: 
             best_params = grid
+            best_params_score = score
             
     print("-----------------------------------")
     print("Best params metric", best_params_score)
