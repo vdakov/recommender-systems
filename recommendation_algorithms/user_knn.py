@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from scipy.spatial.distance import correlation
+from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
 
 from recommendation_algorithms.abstract_recommender import AbstractRecommender
 
