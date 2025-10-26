@@ -4,7 +4,7 @@ import os
 from typing import Dict, List
 import pandas as pd
 import json
-
+from tqdm import tqdm
 
 class AbstractRecommender(ABC):
     """
@@ -75,7 +75,7 @@ class AbstractRecommender(ABC):
         """
         user_ids = train_data['user_id'].unique()
         self.rankings = {}
-        for user_id in user_ids:
+        for user_id in tqdm(user_ids):
             user_df = self.predictions.loc[
                 (self.predictions['user_id'] == user_id),
                 ['item_id', 'predicted_score']
@@ -156,8 +156,7 @@ class AbstractRecommender(ABC):
             ranking_df = pd.DataFrame(ranking, columns=['item_id', 'predicted_score'])
             filepath = os.path.join(folder_path, f'user_{user_id}_ranking.csv')
             ranking_df.to_csv(filepath, index=False)
-            user_dict[user_id] = filepath
+            user_dict[int(user_id)] = filepath
 
-        user_dict_json = json.dumps(user_dict, indent=4)
         with open(os.path.join(folder_path, 'user_ranking_file_map.json'), 'w') as f:
-            f.write(user_dict_json)
+            json.dump(user_dict, f, indent=4)
