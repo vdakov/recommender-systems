@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import itertools
+import os
 from typing import Dict, List
 import pandas as pd
 
@@ -96,3 +97,37 @@ class AbstractRecommender(ABC):
         """
         return self.rankings[user_id][:k]
     
+    def _get_predictions_file_path(self) -> str:
+        """
+        Get the file path for storing/loading precomputed predictions.
+
+        :return: File path as string
+        """
+        folder_path = os.path.join('model_checkpoints', self.get_name().replace(" ", "_").lower())
+        filepath = os.path.join(folder_path, 'predictions.csv')
+        os.makedirs(folder_path, exist_ok=True)
+        return filepath
+    
+    def checkpoint_exists(self) -> bool:
+        """
+        Check if a checkpoint file for predictions exists.
+
+        :return: True if the checkpoint file exists, False otherwise
+        """
+        return os.path.isfile(self._get_predictions_file_path())
+
+    def load_predictions_from_file(self) -> None:
+        """
+        Load precomputed predictions from a CSV file.
+
+        :param filepath: Path to the CSV file containing predictions
+        """
+        self.predictions = pd.read_csv(self._get_predictions_file_path())
+
+    def save_predictions_to_file(self) -> None:
+        """
+        Save precomputed predictions to a CSV file.
+
+        :param filepath: Path to the CSV file to save predictions
+        """
+        self.predictions.to_csv(self._get_predictions_file_path(), index=False)
