@@ -7,7 +7,6 @@ import json
 from tqdm import tqdm, tqdm_pandas
 
 
-
 class AbstractRecommender(ABC):
     """
     Abstract class to represent a recommendation model.
@@ -23,7 +22,7 @@ class AbstractRecommender(ABC):
 
         :param train_data: Dataframe containing training data, relevant keys: user_id, item_id, rating.
         """
-        pass 
+        pass
 
     @abstractmethod
     def get_name(self) -> str:
@@ -48,7 +47,7 @@ class AbstractRecommender(ABC):
     def get_cached_predicted_score(self, user_id: int, item_id: int) -> float:
         """
         Lookup precomputed score a user is predicted to give an item.
-    
+
         :param user_id: Id of the user
         :param item_id: Id of the item
         :returns: Predicted score
@@ -68,6 +67,7 @@ class AbstractRecommender(ABC):
         predictions = pd.DataFrame(pairs, columns=['user_id', 'item_id'])
         predictions['predicted_score'] = predictions.apply(lambda x : self.predict_score(x['user_id'], x['item_id']), axis=1)
         self.predictions = predictions
+        self.normalize_predictions()
 
     def calculate_all_rankings(self, k: int, train_data: pd.DataFrame) -> None:
         """
@@ -93,7 +93,7 @@ class AbstractRecommender(ABC):
             self.rankings[user_id] = top_k
 
     def get_ranking(self, user_id: int, k: int) -> List[tuple[int, float]]:
-        
+
         """
         Lookup precomputed ranking for a user.
 
@@ -102,7 +102,7 @@ class AbstractRecommender(ABC):
         :returns: List of pairs of item_ids and scores (ordered descending)
         """
         return self.rankings[user_id][:k]
-    
+
     def _get_predictions_file_path(self, is_test: bool = False) -> str:
         """
         Get the file path for storing/loading precomputed predictions.
@@ -113,18 +113,6 @@ class AbstractRecommender(ABC):
         folder_path = os.path.join(f'model_checkpoints/{"test" if is_test else "train"}', self.get_name().replace(" ", "_").lower())
         filepath = os.path.join(folder_path, 'predictions.csv')
         os.makedirs(folder_path, exist_ok=True)
-        return filepath
-    
-    def _get_model_file_path(self, is_test: bool = False) -> str:
-        """
-        Get the file path for storing/loading precomputed predictions.
-
-        :param is_test: Whether to use the test or train folder
-        :return: File path as string
-        """
-        folder_path = os.path.join(f'model_checkpoints/{"test" if is_test else "train"}', self.get_name().replace(" ", "_").lower())
-        filepath = os.path.join(folder_path, 'model')
-        os.makedirs(filepath, exist_ok=True)
         return filepath
 
     def _get_ranking_predictions_file_path(self, is_test: bool = False) -> str:
@@ -152,27 +140,35 @@ class AbstractRecommender(ABC):
         """
         Load precomputed predictions from a CSV file.
 
+        :param is_test: Whether to load from the test or train folder
         """
-
         if is_test:
             self.test_predictions = pd.read_csv(self._get_predictions_file_path(is_test=True))
+            
         else:
             self.predictions = pd.read_csv(self._get_predictions_file_path(is_test=False))
-            
+        self.normalize_predictions()
+
     def load_ranking_from_file(self, user_id:int) -> None:
         """
         Load precomputed rankings from a CSV file.
 
+        :param user_id: Id of the user
         """
         file_path = os.path.join(self._get_ranking_predictions_file_path(), f'user_{user_id}_ranking.csv')
         if not hasattr(self, "rankings") or self.rankings is None:
             self.rankings = {}
         self.rankings[user_id] = pd.read_csv(file_path)
-        
-    def load_all_rankings_from_file(self, train_data:pd.DataFrame): 
+
+    def load_all_rankings_from_file(self, train_data: pd.DataFrame):
+        """
+        Load precomputed rankings for all users in the training data from CSV files.
+        :param train_data:
+        :return:
+        """
         for user in tqdm(train_data["user_id"].unique()):
             self.load_ranking_from_file(user)
-            
+
     def save_predictions_to_file(self, is_test: bool = False) -> None:
         """
         Save precomputed predictions to a CSV file.
@@ -209,6 +205,31 @@ class AbstractRecommender(ABC):
         self.calculate_all_predictions(test_data)
         self.save_predictions_to_file(is_test=True)
         print("Calculated and saved predictions for test data.")
+        
+    def normalize_predictions(self, min_rating: float = 1.0, max_rating: float = 5.0) -> None:
+        """
+        Linearly normalize all predicted scores to a valid range [min_rating, max_rating].
+
+        :param min_rating: Minimum rating value (default=1.0)
+        :param max_rating: Maximum rating value (default=5.0)
+        """
+        if not hasattr(self, "predictions") or self.predictions is None or self.predictions.empty:
+            raise ValueError("No predictions available to normalize. Please run calculate_all_predictions() first.")
+
+        preds = self.predictions["predicted_score"]
+        min_pred, max_pred = preds.min(), preds.max()
+
+        if min_pred == max_pred:
+            # avoid division by zero if all predictions are identical
+            self.predictions["predicted_score"] = min_rating + (max_rating - min_rating) / 2
+            print("All predictions had the same value. Set to midpoint of normalization range.")
+            return
+
+        self.predictions["predicted_score"] = (
+            min_rating + (preds - min_pred) * (max_rating - min_rating) / (max_pred - min_pred)
+        )
+
+        print(f"Predictions normalized linearly to range [{min_rating}, {max_rating}].")
 
     def calculate_ranking_predictions_test_data(self, test_data: pd.DataFrame, k: int) -> None:
         """
@@ -220,3 +241,15 @@ class AbstractRecommender(ABC):
         self.calculate_all_rankings(k, test_data)
         self.save_rankings_to_file(is_test=True)
         print("Calculated and saved predictions and rankings for test data.")
+        
+    def _get_model_file_path(self, is_test: bool = False) -> str:
+        """
+        Get the file path for storing/loading precomputed predictions.
+
+        :param is_test: Whether to use the test or train folder
+        :return: File path as string
+        """
+        folder_path = os.path.join(f'model_checkpoints/{"test" if is_test else "train"}', self.get_name().replace(" ", "_").lower())
+        filepath = os.path.join(folder_path, 'model')
+        os.makedirs(filepath, exist_ok=True)
+        return filepath
