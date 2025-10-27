@@ -200,7 +200,7 @@ class BayesianProbabilisticRanking(AbstractRecommender):
     def calculate_all_rankings(self, k: int, train_data: pd.DataFrame) -> None:
         self.rankings = {}
         for user_id in train_data['user_id'].unique():
-            ranking = self.recommend_topk(user_id, train_data, k)
+            ranking = self.recommend_topk(user_id, train_data, k, exclude_seen=False)
             self.rankings[user_id] = ranking
             
     def save_model(self):
