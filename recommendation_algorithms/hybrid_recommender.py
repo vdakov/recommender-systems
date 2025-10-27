@@ -208,7 +208,7 @@ class HybridRecommender:
         max_snapshots: int = 250,          # cap history length
         track_dims: Optional[Sequence[int]] = None  # which weight indices to plot (None = all)
     ):
-        ws0 = np.zeros(len(self.ranking_recommenders), dtype=float)
+        ws0 = np.ones(len(self.ranking_recommenders), dtype=float) / len(self.ranking_recommenders)
 
         ap_history: List[float] = []
         weights_history: List[np.ndarray] = []
@@ -247,7 +247,7 @@ class HybridRecommender:
             smooth_ap /= len(user_ids)
             # Calculate MSE
             last_f['val'] = smooth_ap
-            return smooth_ap
+            return 1 - smooth_ap # We minimize 1 - smooth AP
 
         # Callback used to keep track of MSE for visualization purposes
         def cb(wk: np.ndarray):
