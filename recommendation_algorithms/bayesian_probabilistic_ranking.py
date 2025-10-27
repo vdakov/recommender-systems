@@ -1,3 +1,4 @@
+import itertools
 from typing import Dict, List
 import pandas as pd
 import numpy as np
@@ -25,7 +26,6 @@ class BayesianProbabilisticRanking(AbstractRecommender):
         self.Q = None  # Item latent factors
         self.item_bias = None
         self.global_mean = None
-        self.use_bias = False # TODO what is this?
 
     def get_name(self) -> str:
         return "Bayesian Probabilistic Ranking"
@@ -43,7 +43,7 @@ class BayesianProbabilisticRanking(AbstractRecommender):
         unique_items = ratings["item_id"].unique()
         unique_users = ratings["user_id"].unique()
         
-        full_index = pd.MultiIndex.from_product([unique_items, unique_users], names=["user_id", "item_id"])
+        full_index = pd.MultiIndex.from_product([unique_items, unique_users], names=["item_id", "user_id"])
         full_df = pd.DataFrame(index=full_index).reset_index()
         expanded = full_df.merge(ratings, on=["user_id", "item_id"], how="left").fillna({"rating":0})
 
@@ -56,7 +56,6 @@ class BayesianProbabilisticRanking(AbstractRecommender):
         Args:
             ratings (pd.DataFrame): dataframe with [user_id, item_id, rating] 
         """
-        ratings = train_data["rating"]
         ratings = self.expand_dataframe(train_data)
         
         self.user_mapping = {u: i for i, u in enumerate(ratings['user_id'].unique())}
@@ -74,8 +73,6 @@ class BayesianProbabilisticRanking(AbstractRecommender):
 
         # SGD loop
         for _ in tqdm(range(self.n_epochs)):
-            total_error = 0
-            
             # Sampling is done via bootstrapping
             for _ in tqdm(range(self.num_samples_per_epoch)):
                 u = np.random.choice(ratings["user_id"].unique())
@@ -83,40 +80,71 @@ class BayesianProbabilisticRanking(AbstractRecommender):
                 j = np.random.choice(ratings["item_id"].unique())
                 r_ui, r_uj = self.user_item_rating[(u, i)], self.user_item_rating[(u, j)]
                 
-                x_ui = np.dot(self.P[u - 1], self.Q[i - 1])
-                x_uj = np.dot(self.P[u - 1], self.Q[j - 1])
+                x_ui = np.dot(self.P[self.user_mapping[u]], self.Q[self.item_mapping[i]])
+                x_uj = np.dot(self.P[self.user_mapping[u]], self.Q[self.item_mapping[j]])
                 
                 x_uij_hat = x_ui - x_uj
                 x_uij = r_ui - r_uj
                 
-                P_u = self.P[u - 1]
-                Q_i = self.Q[i - 1]
-                Q_j = self.Q[j - 1]
+                P_u = self.P[self.user_mapping[u]]
+                Q_i = self.Q[self.item_mapping[i]]
+                Q_j = self.Q[self.item_mapping[j]]
                 
                 partial_P_u = Q_i - Q_j
                 partial_Q_i = P_u
                 partial_Q_j = -1 * P_u
-                partial_P_u_prior = 2 * np.exp(np.square(P_u)) * P_u * (1 / np.sqrt(2 * np.pi))
-                partial_Q_i_prior = 2 * np.exp(np.square(Q_i)) * Q_i * (1 / np.sqrt(2 * np.pi))
-                partial_Q_j_prior = 2 * np.exp(np.square(Q_j)) * Q_j * (1 / np.sqrt(2 * np.pi))
+                #differentiated terms - lambda is sigma here
+                partial_P_u_prior = -self.regularization * P_u
+                partial_Q_i_prior = -self.regularization * Q_i
+                partial_Q_j_prior = -self.regularization * Q_j
 
-                self.P[u - 1] += self.learning_rate * (partial_P_u + partial_P_u_prior)
-                self.Q[i - 1] += self.learning_rate * (partial_Q_i + partial_Q_i_prior)
-                self.Q[j - 1] += self.learning_rate * (partial_Q_j + partial_Q_j_prior)
+
+                self.P[self.user_mapping[u]] += self.learning_rate * (partial_P_u + partial_P_u_prior)
+                self.Q[self.item_mapping[i]] += self.learning_rate * (partial_Q_i + partial_Q_i_prior)
+                self.Q[self.item_mapping[j]] += self.learning_rate * (partial_Q_j + partial_Q_j_prior)
 
         return self
+    
+        
+    def calculate_all_predictions(self, train_data: pd.DataFrame) -> None:
+        """
+        Calculate and save all rating predictions (each user/item pair) in the training data.
+
+        :param train_data: Training data containing user_ids and item_ids
+        """
+        tqdm.pandas()
+        user_ids = train_data['user_id'].unique()
+        item_ids = train_data['item_id'].unique()
+       
+        pairs = list(itertools.product(user_ids, item_ids))
+        predictions = pd.DataFrame(pairs, columns=['user_id', 'item_id'])
+        def predict_score_unnormalized(user_id, item_id):
+            u = self.user_mapping[user_id]
+            i = self.item_mapping[item_id]
+
+
+            pred = np.dot(self.P[u], self.Q[i])
+            return pred
+        
+        predictions['predicted_score'] = predictions.apply(lambda x : predict_score_unnormalized(x['user_id'], x['item_id']), axis=1)
+        self.min_val = predictions['predicted_score'].min()
+        self.max_val = predictions['predicted_score'].max()
+        predictions['predicted_score'] = 1 + 4 * (
+                    (predictions['predicted_score'] - self.min_val)
+                    / (self.max_val - self.min_val)
+                )
+        self.predictions = predictions
 
     def predict_score(self, user_id: int, item_id: int) -> float:
         """Predict rating for a single (user, item) pair"""
-        if user_id not in self.user_mapping or item_id not in self.item_mapping:
-            return np.nan
 
+        
         u = self.user_mapping[user_id]
         i = self.item_mapping[item_id]
 
+
         pred = np.dot(self.P[u], self.Q[i])
-        if self.use_bias:
-            pred += self.global_mean + self.user_bias[u] + self.item_bias[i]
+        pred = 1 + 4 * (pred - self.min_val) / (self.max_val - self.min_val)
         return pred
     
     def predict_order_two_items(self, user, item_i, item_j):
@@ -129,7 +157,7 @@ class BayesianProbabilisticRanking(AbstractRecommender):
         """Predict ratings for a test dataframe with [user_id, item_id]"""
         preds = []
         for u, i in zip(test_data['user_id'], test_data['item_id']):
-            preds.append(self.predict_single(u, i))
+            preds.append(self.predict_score(u, i))
         return np.array(preds)
 
     def recommend_topk(self, user_id, train_data, n=10, exclude_seen=True):
@@ -153,8 +181,6 @@ class BayesianProbabilisticRanking(AbstractRecommender):
 
         # Predict scores for all items
         scores = np.dot(self.P[u], self.Q.T)
-        if self.use_bias:
-            scores += self.global_mean + self.user_bias[u] + self.item_bias
 
         # Exclude seen items
         if exclude_seen:
@@ -171,6 +197,7 @@ class BayesianProbabilisticRanking(AbstractRecommender):
     
     # Override as it works differently from the rating prediction rankers
     def calculate_all_rankings(self, k: int, train_data: pd.DataFrame) -> None:
+        self.rankings = {}
         for user_id in train_data['user_id'].unique():
             ranking = self.recommend_topk(user_id, train_data, k)
             self.rankings[user_id] = ranking

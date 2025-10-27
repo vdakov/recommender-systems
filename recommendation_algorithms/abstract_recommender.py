@@ -93,6 +93,7 @@ class AbstractRecommender(ABC):
             self.rankings[user_id] = top_k
 
     def get_ranking(self, user_id: int, k: int) -> List[tuple[int, float]]:
+        
         """
         Lookup precomputed ranking for a user.
 

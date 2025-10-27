@@ -130,7 +130,7 @@ class ContentBasedRecommender(AbstractRecommender):
 
         :return: The name of the model
         """
-        return "Content-Based Recommender Using BERT Embeddings"
+        return "Content Based Recommender"
     
     def predict_computability_between_user_and_item(self, user_id, item_id):
         user_emb = self.get_user_emb(user_id)
