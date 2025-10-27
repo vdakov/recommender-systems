@@ -142,19 +142,25 @@ class AbstractRecommender(ABC):
 
         """
 
-
         if is_test:
             self.test_predictions = pd.read_csv(self._get_predictions_file_path(is_test=True))
         else:
             self.predictions = pd.read_csv(self._get_predictions_file_path(is_test=False))
             
-    def load_ranking_from_file(self) -> None:
+    def load_ranking_from_file(self, user_id:int) -> None:
         """
         Load precomputed rankings from a CSV file.
 
         """
-        self.ranking = pd.read_csv(self._get_ranking_predictions_file_path())
-
+        file_path = os.path.join(self._get_ranking_predictions_file_path(), f'user_{user_id}_ranking.csv')
+        if not hasattr(self, "rankings") or self.rankings is None:
+            self.rankings = {}
+        self.rankings[user_id] = pd.read_csv(file_path)
+        
+    def load_all_rankings_from_file(self, train_data:pd.DataFrame): 
+        for user in tqdm(train_data["user_id"].unique()):
+            self.load_ranking_from_file(user)
+            
     def save_predictions_to_file(self, is_test: bool = False) -> None:
         """
         Save precomputed predictions to a CSV file.

@@ -64,8 +64,8 @@ class BayesianProbabilisticRanking(AbstractRecommender):
         self.item_inv = {j: i for i, j in self.item_mapping.items()}
         self.user_item_rating = {(u, i): r for u, i, r in zip(ratings['user_id'], ratings['item_id'], ratings['rating'])}
 
-        n_users = max(len(ratings["user_id"].unique()), ratings["user_id"].max())
-        n_items = max(len(ratings["item_id"].unique()), ratings["item_id"].max())
+        n_users = len(ratings["user_id"].unique())
+        n_items = len(ratings["item_id"].unique())
 
         # Initialize factors
         self.P = np.random.normal(0, 1, (n_users, self.n_factors))
@@ -137,11 +137,8 @@ class BayesianProbabilisticRanking(AbstractRecommender):
 
     def predict_score(self, user_id: int, item_id: int) -> float:
         """Predict rating for a single (user, item) pair"""
-
-        
         u = self.user_mapping[user_id]
         i = self.item_mapping[item_id]
-
 
         pred = np.dot(self.P[u], self.Q[i])
         pred = 1 + 4 * (pred - self.min_val) / (self.max_val - self.min_val)
@@ -189,6 +186,7 @@ class BayesianProbabilisticRanking(AbstractRecommender):
             scores[seen_idx] = -np.inf
 
         # Get top-K items
+        
         top_idx = np.argsort(scores)[::-1][:n]
         top_items = [int(self.item_inv[i]) for i in top_idx]
         top_scores = scores[top_idx]

@@ -158,7 +158,6 @@ class MatrixFactorizationSGD(AbstractRecommender):
 
         return list(zip(top_items, top_scores))
     
-    
     # Override as it works differently from the rating prediction rankers
     def calculate_all_rankings(self, k: int, train_data: pd.DataFrame) -> None:
         self.rankings = {}
