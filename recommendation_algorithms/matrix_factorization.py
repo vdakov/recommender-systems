@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 import itertools 
+import os 
+import pickle
 from recommendation_algorithms.abstract_recommender import AbstractRecommender
 
 class MatrixFactorizationSGD(AbstractRecommender):
@@ -164,3 +166,56 @@ class MatrixFactorizationSGD(AbstractRecommender):
         for user_id in train_data['user_id'].unique():
             ranking = self.recommend_topk(user_id, train_data, k)
             self.rankings[user_id] = ranking
+            
+    def save_model(self):
+        folder_path = self._get_model_file_path()
+        os.makedirs(folder_path, exist_ok=True)
+
+        np.save(os.path.join(folder_path, "P.npy"), self.P)
+        np.save(os.path.join(folder_path, "Q.npy"), self.Q)
+        if self.use_bias:
+            np.save(os.path.join(folder_path, "user_bias.npy"), self.user_bias)
+            np.save(os.path.join(folder_path, "item_bias.npy"), self.item_bias)
+            with open(os.path.join(folder_path, "global_mean.pkl"), "wb") as f:
+                pickle.dump(self.global_mean, f)
+
+        # Save mappings and config
+        with open(os.path.join(folder_path, "mappings.pkl"), "wb") as f:
+            pickle.dump({
+                "user_mapping": self.user_mapping,
+                "item_mapping": self.item_mapping,
+                "user_inv": self.user_inv,
+                "item_inv": self.item_inv,
+                "n_factors": self.n_factors,
+                "learning_rate": self.learning_rate,
+                "regularization": self.regularization,
+                "n_epochs": self.n_epochs,
+                "use_bias": self.use_bias
+            }, f)
+
+        print(f"Model saved to {folder_path}")
+
+    def load_model(self):
+        folder_path = self._get_model_file_path()
+
+        self.P = np.load(os.path.join(folder_path, "P.npy"))
+        self.Q = np.load(os.path.join(folder_path, "Q.npy"))
+        if self.use_bias:
+            self.user_bias = np.load(os.path.join(folder_path, "user_bias.npy"))
+            self.item_bias = np.load(os.path.join(folder_path, "item_bias.npy"))
+            with open(os.path.join(folder_path, "global_mean.pkl"), "rb") as f:
+                self.global_mean = pickle.load(f)
+
+        with open(os.path.join(folder_path, "mappings.pkl"), "rb") as f:
+            mappings = pickle.load(f)
+            self.user_mapping = mappings["user_mapping"]
+            self.item_mapping = mappings["item_mapping"]
+            self.user_inv = mappings["user_inv"]
+            self.item_inv = mappings["item_inv"]
+            self.n_factors = mappings["n_factors"]
+            self.learning_rate = mappings["learning_rate"]
+            self.regularization = mappings["regularization"]
+            self.n_epochs = mappings["n_epochs"]
+            self.use_bias = mappings["use_bias"]
+
+        print(f"Model loaded from {folder_path}")

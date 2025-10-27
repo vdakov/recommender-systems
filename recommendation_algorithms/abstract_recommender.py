@@ -114,6 +114,18 @@ class AbstractRecommender(ABC):
         filepath = os.path.join(folder_path, 'predictions.csv')
         os.makedirs(folder_path, exist_ok=True)
         return filepath
+    
+    def _get_model_file_path(self, is_test: bool = False) -> str:
+        """
+        Get the file path for storing/loading precomputed predictions.
+
+        :param is_test: Whether to use the test or train folder
+        :return: File path as string
+        """
+        folder_path = os.path.join(f'model_checkpoints/{"test" if is_test else "train"}', self.get_name().replace(" ", "_").lower())
+        filepath = os.path.join(folder_path, 'model')
+        os.makedirs(filepath, exist_ok=True)
+        return filepath
 
     def _get_ranking_predictions_file_path(self, is_test: bool = False) -> str:
         """
