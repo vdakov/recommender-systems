@@ -35,6 +35,7 @@ class ItemKNN(AbstractRecommender):
         Parameters
         :param k: k value for number of nearest neighbors
         """
+        self.similarity = ""
         self.train_data = pd.DataFrame() # train_data
         self.test_data = pd.DataFrame() # test_data
         self.item_ids = []
@@ -45,7 +46,7 @@ class ItemKNN(AbstractRecommender):
     def get_name(self) -> str:
         return 'Item KNN'
 
-    def train(self, train_data: pd.DataFrame) -> None:  # TODO: may add another field containing sorted list for each item? should give speed-ups w/ continued use
+    def train(self, train_data: pd.DataFrame) -> None:
         self.train_data = train_data
         self.item_ids = list(self.train_data['item_id'].unique())  # items in training data
         
@@ -70,7 +71,7 @@ class ItemKNN(AbstractRecommender):
         self.similarity_matrix = similarity_matrix
         self.fit = True 
 
-    def get_k_neighbors(self, target_item, similarity_matrix: pd.DataFrame = None) -> pd.Series:  # TODO: may add a cache for speed (discuss)
+    def get_k_neighbors(self, target_item, similarity_matrix: pd.DataFrame = None) -> pd.Series:
         """
         Get top-k most similar items to target item.
 
