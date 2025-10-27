@@ -88,12 +88,15 @@ class RandomRanker(AbstractRecommender):
             self.unseen_items[user_id] = unseen_items_for_user
 
     def predict_score(self, user_id: int, item_id: int) -> float:
-        raise ValueError("Predicting score not implemented for ranker")
+        return np.random.uniform(0, 5)
     
-    def predict_ranking(self, user_id: int, k: int) -> List[int]:
-        # Randomly recommend unseen items (items not interacted by the target user in training data) to each user
-        unseen_items = self.unseen_items[user_id]
-        return random.sample(unseen_items, k)
+    def calculate_all_rankings(self, k: int, train_data: pd.DataFrame) -> None:
+        self.rankings = {}
+        for user_id in train_data['user_id'].unique():
+            unseen_items = self.unseen_items[user_id]
+            items_with_scores = [(item_id, self.predict_score(user_id, item_id)) for item_id in unseen_items]
+            sorted_items = sorted(items_with_scores, key= lambda x : x[1], reverse=True)[:k]
+            self.rankings[user_id] = sorted_items
 
 class PopularRanker(AbstractRecommender):
     unseen_items: Dict[int, List[int]] # For each user keep track of unseen items
@@ -103,6 +106,9 @@ class PopularRanker(AbstractRecommender):
         self.unseen_items = {}
         self.popularities = {}
         self.train(train_data)
+
+    def get_name(self) -> str:
+        return "Popularity Based Ranker"
 
     def train(self, train_data: pd.DataFrame) -> None:
         # Find unseen items for each user
@@ -124,10 +130,17 @@ class PopularRanker(AbstractRecommender):
     def predict_score(self, user_id: int, item_id: int) -> float:
         raise ValueError("Predicting score not implemented for ranker")
 
-    def predict_ranking(self, user_id: int, k: int) -> List[int]:
+    def predict_ranking(self, user_id: int, k: int) -> List[tuple[int, float]]:
         # Recommend most popular items that are not yet interacted by the target user. Most popular items are the ones that are rated by majority of users in the training data.
         unseen_items = self.unseen_items[user_id]
-        items_with_popularity = [(item_id, self.popularities[item_id]) for item_id in unseen_items]
-        sorted_items = sorted(items_with_popularity, key= lambda x : x.get, reverse=True)
+        def normalize_popularity(popularity: int) -> float:
+            return popularity / max(self.popularities.values()) * 5.0  # Scale to rating range (1-5)
+        items_with_popularity = [(item_id, normalize_popularity(self.popularities[item_id])) for item_id in unseen_items]
+        sorted_items = sorted(items_with_popularity, key= lambda x : x[1], reverse=True)
         return sorted_items[:k]
     
+    def calculate_all_rankings(self, k: int, train_data: pd.DataFrame) -> None:
+        self.rankings = {}
+        for user_id in train_data['user_id'].unique():
+            ranking = self.predict_ranking(user_id, k)
+            self.rankings[user_id] = ranking
