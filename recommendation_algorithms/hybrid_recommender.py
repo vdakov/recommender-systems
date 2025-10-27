@@ -64,6 +64,7 @@ class HybridRecommender:
             print(f'Finished rating linear regression, weights are:')
             for i in range(len(self.rating_recommenders)):
                 print(f'  {self.rating_recommenders[i].get_name()}: {self.rating_weights[i]}')
+<<<<<<< HEAD
         if self.verbose:
             print('Started linear regression for ranking...')
         self._linear_regression_ranking(train_data, self.max_k, visualize=self.verbose)
@@ -72,6 +73,8 @@ class HybridRecommender:
             for i in range(len(self.ranking_recommenders)):
                 print(f'  {self.ranking_recommenders[i].get_name()}: {self.ranking_weights[i]}')
 
+=======
+>>>>>>> a49f3cb1f759abdb417e601f92bc9e08faa77e12
         # Precompute all predictions for hybrid rater/ranker
         # Rating
         print(f"Precomputing predictions...")
