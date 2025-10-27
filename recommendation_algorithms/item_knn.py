@@ -4,7 +4,8 @@ from tqdm import tqdm
 from scipy.spatial.distance import cosine
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
 from scipy.spatial.distance import correlation
-
+import os 
+import pickle
 from recommendation_algorithms.abstract_recommender import AbstractRecommender
 
 
@@ -124,3 +125,62 @@ class ItemKNN(AbstractRecommender):
         denominator = sims.abs().sum()
 
         return numerator / denominator if denominator != 0 else 0.0
+    
+    def save_model(self):
+        """Save model configuration, training data, and similarity matrix."""
+        folder_path = self._get_model_file_path()
+        os.makedirs(folder_path, exist_ok=True)
+
+        # Save training data
+        if not self.train_data.empty:
+            self.train_data.to_csv(os.path.join(folder_path, "train_data.csv"), index=False)
+
+        # Save similarity matrix
+        self.similarity_matrix.to_csv(os.path.join(folder_path, "similarity_matrix.csv"))
+
+        # Save config
+        with open(os.path.join(folder_path, "config.pkl"), "wb") as f:
+            pickle.dump({
+                "k": self.k,
+                "similarity": self.similarity,
+                "fit": self.fit
+            }, f)
+
+        print(f"ItemKNN model saved to {folder_path}")
+
+    def load_model(self):
+        """Load model configuration, training data, and similarity matrix."""
+        folder_path = self._get_model_file_path()
+
+        # Load training data
+        train_path = os.path.join(folder_path, "train_data.csv")
+        if os.path.exists(train_path):
+            self.train_data = pd.read_csv(train_path)
+            self.item_ids = list(self.train_data['item_id'].unique())
+        else:
+            self.train_data = pd.DataFrame()
+
+        # Load similarity matrix
+        sim_path = os.path.join(folder_path, "similarity_matrix.csv")
+        if os.path.exists(sim_path):
+            self.similarity_matrix = pd.read_csv(sim_path, index_col=0)
+            self.similarity_matrix.index = self.similarity_matrix.index.astype(int)
+            self.similarity_matrix.columns = self.similarity_matrix.columns.astype(int)
+        else:
+            self.similarity_matrix = pd.DataFrame()
+
+        # Load configuration
+        cfg_path = os.path.join(folder_path, "config.pkl")
+        if os.path.exists(cfg_path):
+            with open(cfg_path, "rb") as f:
+                cfg = pickle.load(f)
+                self.k = cfg.get("k", 5)
+                self.similarity = cfg.get("similarity", "cosine")
+                self.fit = cfg.get("fit", False)
+        else:
+            self.k = 5
+            self.similarity = "cosine"
+            self.fit = False
+
+        print(f"ItemKNN model loaded from {folder_path}")
+

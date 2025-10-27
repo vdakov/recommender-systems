@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 from recommendation_algorithms.abstract_recommender import AbstractRecommender
 from tqdm import tqdm 
+import os 
+import pickle
 
 class BayesianProbabilisticRanking(AbstractRecommender):
     rankings: Dict[int, List[tuple[int, float]]]
@@ -199,3 +201,44 @@ class BayesianProbabilisticRanking(AbstractRecommender):
         for user_id in train_data['user_id'].unique():
             ranking = self.recommend_topk(user_id, train_data, k)
             self.rankings[user_id] = ranking
+            
+    def save_model(self):
+        folder_path = self._get_model_file_path()
+        os.makedirs(folder_path, exist_ok=True)
+
+        np.save(os.path.join(folder_path, "P.npy"), self.P)
+        np.save(os.path.join(folder_path, "Q.npy"), self.Q)
+
+        # Save mappings and config
+        with open(os.path.join(folder_path, "mappings.pkl"), "wb") as f:
+            pickle.dump({
+                "user_mapping": self.user_mapping,
+                "item_mapping": self.item_mapping,
+                "user_inv": self.user_inv,
+                "item_inv": self.item_inv,
+                "n_factors": self.n_factors,
+                "learning_rate": self.learning_rate,
+                "regularization": self.regularization,
+                "n_epochs": self.n_epochs,
+            }, f)
+
+        print(f"Model saved to {folder_path}")
+
+    def load_model(self):
+        folder_path = self._get_model_file_path()
+
+        self.P = np.load(os.path.join(folder_path, "P.npy"))
+        self.Q = np.load(os.path.join(folder_path, "Q.npy"))
+
+        with open(os.path.join(folder_path, "mappings.pkl"), "rb") as f:
+            mappings = pickle.load(f)
+            self.user_mapping = mappings["user_mapping"]
+            self.item_mapping = mappings["item_mapping"]
+            self.user_inv = mappings["user_inv"]
+            self.item_inv = mappings["item_inv"]
+            self.n_factors = mappings["n_factors"]
+            self.learning_rate = mappings["learning_rate"]
+            self.regularization = mappings["regularization"]
+            self.n_epochs = mappings["n_epochs"]
+
+        print(f"Model loaded from {folder_path}")

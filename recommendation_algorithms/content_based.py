@@ -5,8 +5,10 @@ from typing import List
 from tqdm import tqdm 
 from transformers import AutoTokenizer, AutoModel
 from recommendation_algorithms.abstract_recommender import AbstractRecommender
+import os 
+import pickle 
 
-class ContentBasedRecommender(AbstractRecommender):
+class   ContentBasedRecommender(AbstractRecommender):
     """
     Content-based recommender based on embeddings from BERT.
     """
@@ -151,3 +153,61 @@ class ContentBasedRecommender(AbstractRecommender):
         score = self.predict_computability_between_user_and_item(user_id, item_id)
         rating = 1 + (score - self.min_val) * (4 / (self.max_val - self.min_val))
         return rating
+    
+    def save_model(self):
+        """Save embeddings, parameters, and settings"""
+        folder_path = self._get_model_file_path()
+        os.makedirs(folder_path, exist_ok=True)
+
+        # Save item embeddings
+        np.save(os.path.join(folder_path, "item_embeddings.npy"), self.item_embeddings)
+
+        # Save scalar values
+        with open(os.path.join(folder_path, "scalars.pkl"), "wb") as f:
+            pickle.dump({
+                "min_val": self.min_val,
+                "max_val": self.max_val
+            }, f)
+
+        # Save configuration/settings
+        with open(os.path.join(folder_path, "settings.pkl"), "wb") as f:
+            pickle.dump({
+                "bert_model": self.bert_model,
+                "batch_size": self.batch_size,
+                "aggregation_method": self.aggregation_method
+            }, f)
+
+        # Save data (optional, only if needed for inference)
+        if self.data is not None:
+            self.data.to_csv(os.path.join(folder_path, "data.csv"), index=False)
+
+        print(f"Content-based model saved to {folder_path}")
+
+    def load_model(self):
+        """Load embeddings, parameters, and settings"""
+        folder_path = self._get_model_file_path()
+
+        # Load embeddings
+        self.item_embeddings = np.load(os.path.join(folder_path, "item_embeddings.npy"))
+
+        # Load scalars
+        with open(os.path.join(folder_path, "scalars.pkl"), "rb") as f:
+            scalars = pickle.load(f)
+            self.min_val = scalars["min_val"]
+            self.max_val = scalars["max_val"]
+
+        # Load settings
+        with open(os.path.join(folder_path, "settings.pkl"), "rb") as f:
+            settings = pickle.load(f)
+            self.bert_model = settings["bert_model"]
+            self.batch_size = settings["batch_size"]
+            self.aggregation_method = settings["aggregation_method"]
+
+        # Load data if it exists
+        data_path = os.path.join(folder_path, "data.csv")
+        if os.path.exists(data_path):
+            self.data = pd.read_csv(data_path)
+        else:
+            self.data = None
+
+        print(f"Content-based model loaded from {folder_path}")
