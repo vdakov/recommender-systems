@@ -66,7 +66,6 @@ class HybridRecommender:
             print(f'Finished rating linear regression, weights are:')
             for i in range(len(self.rating_recommenders)):
                 print(f'  {self.rating_recommenders[i].get_name()}: {self.rating_weights[i]}')
-
         # Precompute all predictions for hybrid rater/ranker
         # Rating
         print(f"Precomputing predictions...")
