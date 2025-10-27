@@ -217,6 +217,8 @@ class AbstractRecommender(ABC):
         :param test_data: Test data containing user_ids and item_ids
         :param k: Ranking list size
         """
+        if self.predictions is None:
+            self.load_predictions_from_file(is_test=False)
         self.calculate_all_rankings(k, test_data)
         self.save_rankings_to_file(is_test=True)
         print("Calculated and saved predictions and rankings for test data.")
