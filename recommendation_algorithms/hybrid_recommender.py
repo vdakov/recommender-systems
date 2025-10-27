@@ -42,6 +42,7 @@ class HybridRecommender:
             # Load model predictions from checkpoint if available
             if recommender.checkpoint_exists() and not self.override_recommender_checkpoints:
                 recommender.load_predictions_from_file()
+                recommender.load_model()
                 trained_recommenders.append(recommender.get_name())
                 if self.verbose:
                     print(f'  Loaded predictions for {recommender.get_name()} from checkpoint.')

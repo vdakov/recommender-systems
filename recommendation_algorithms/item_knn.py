@@ -173,11 +173,17 @@ class ItemKNN(AbstractRecommender):
         # Load configuration
         cfg_path = os.path.join(folder_path, "config.pkl")
         if os.path.exists(cfg_path):
-            with open(cfg_path, "rb") as f:
-                cfg = pickle.load(f)
-                self.k = cfg.get("k", 5)
-                self.similarity = cfg.get("similarity", "cosine")
-                self.fit = cfg.get("fit", False)
+            try:
+                with open(cfg_path, "rb") as f:
+                    cfg = pickle.load(f)
+                    self.k = cfg.get("k", 5)
+                    self.similarity = cfg.get("similarity", "cosine")
+                    self.fit = cfg.get("fit", False)
+            except (EOFError, pickle.UnpicklingError, AttributeError, ValueError):
+                # Handle corrupted or empty pickle
+                self.k = 5
+                self.similarity = "cosine"
+                self.fit = False
         else:
             self.k = 5
             self.similarity = "cosine"
