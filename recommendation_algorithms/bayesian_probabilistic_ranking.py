@@ -58,6 +58,7 @@ class BayesianProbabilisticRanking(AbstractRecommender):
         Args:
             ratings (pd.DataFrame): dataframe with [user_id, item_id, rating] 
         """
+        self.train_data = train_data
         ratings = self.expand_dataframe(train_data)
         
         self.user_mapping = {u: i for i, u in enumerate(ratings['user_id'].unique())}
@@ -183,7 +184,7 @@ class BayesianProbabilisticRanking(AbstractRecommender):
 
         # Exclude seen items
         if exclude_seen:
-            seen_items = train_data[train_data['user_id'] == user_id]['item_id'].values
+            seen_items = self.train_data[self.train_data['user_id'] == user_id]['item_id'].values
             seen_idx = [self.item_mapping[i] for i in seen_items if i in self.item_mapping]
             scores[seen_idx] = -np.inf
 
