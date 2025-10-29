@@ -3,3 +3,5 @@ _MACOSX
 .idea
 recommendation_algorithms/__pycache__
 model_checkpoints/test-old
+model_checkpoints.zip
+train-fix-code.zip
